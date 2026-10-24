@@ -18,7 +18,14 @@
 
 ## 运行
 
-需要 Python 3.10+，macOS / Windows 都可以。
+需要 Python 3.9+。已在 macOS 26（Apple Silicon）+ Python 3.12 / 3.14 上实测；Windows 理论上可以运行，但还没实测。
+
+**macOS 双击启动**：在 Finder 里双击 `启动大肥鱼飞行棋.command`。
+第一次会自动建虚拟环境并安装 PySide6-Essentials（约 360 MB，视网速要等几分钟），之后就秒开。
+游戏运行时会开着一个终端窗口，关掉它游戏也会退出。
+如果是下载 zip 解压的，系统可能提示"无法验证开发者"：右键这个文件 → 打开 → 再点一次打开即可。
+
+**命令行启动**：
 
 ```bash
 python3 -m venv .venv
@@ -26,6 +33,9 @@ source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python board_game.py
 ```
+
+操作：点骰子或按空格掷骰 · 拖动空白处移动窗口 · 右键菜单 · Esc 退出。
+在 macOS 上，程序名和程序坞图标目前显示为 Python。
 
 ## 后续计划
 
