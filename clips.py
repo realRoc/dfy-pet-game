@@ -43,7 +43,8 @@ def add_menus(menu, play):
     for cat, names in CATEGORIES:
         sub = menu.addMenu(cat)
         for name in names:
-            sub.addAction(label(name), lambda n=name: play(n))
+            # 显式接住 triggered(bool) 的 checked，免得哪天它被塞进 n、名字变成 False 而随机播
+            sub.addAction(label(name), lambda _checked=False, n=name: play(n))
 
 
 class ClipPlayer:

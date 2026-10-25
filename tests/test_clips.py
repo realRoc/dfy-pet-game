@@ -17,6 +17,26 @@ else:
 
 
 @unittest.skipIf(_SKIP, _SKIP)
+class ClipMenuTest(unittest.TestCase):
+    def test_menu_plays_named_clip(self):
+        """点菜单里哪一段就播哪一段（triggered 带的 checked 不能顶掉名字）。"""
+        from PySide6.QtWidgets import QApplication, QMenu
+        app = QApplication.instance() or QApplication([])
+        menu = QMenu()
+        played = []
+        clips.add_menus(menu, played.append)
+        subs = menu.findChildren(QMenu)
+        self.assertEqual([s.title() for s in subs], [c for c, _ in clips.CATEGORIES])
+        for sub, (_, names) in zip(subs, clips.CATEGORIES):
+            for act, name in zip(sub.actions(), names):
+                self.assertEqual(act.text(), clips.label(name))
+                played.clear()
+                act.trigger()
+                self.assertEqual(played, [name])
+        self.assertIsNotNone(app)
+
+
+@unittest.skipIf(_SKIP, _SKIP)
 class ClipPlayerTest(unittest.TestCase):
     def setUp(self):
         self.NAME = next(iter(clips.CLIPS))
