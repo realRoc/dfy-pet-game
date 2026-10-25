@@ -476,12 +476,11 @@ class BoardWindow(QWidget):
         self.glow_node, self.glow_t = self.board.node_id, 1.0
         here = self.board.node_id
         landing = self.rules.land(self.board)
-        if landing.expression in clips.CLIPS:
-            self.clip.start(landing.expression)
+        if landing.expression in clips.CLIPS and self.clip.start(landing.expression):
             self.say(landing.say or f"【{clips.label(landing.expression)}】", 3.0)
         elif landing.expression:
             key = landing.expression if landing.expression in EXPRESSIONS else None
-            # 问号格不指定表情：表情和动作动画一起抽
+            # 问号格不指定表情（或者指定的动作动画打不开）：表情和动作动画一起抽
             if key is None and clips.AVAILABLE and random.random() < 0.5 and self.clip.start():
                 self.say(landing.say or f"【{clips.label(self.clip.name)}】", 3.0)
             else:

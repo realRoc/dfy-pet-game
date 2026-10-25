@@ -154,10 +154,12 @@ STYLE_REF=/path/to/动森截图.png tools/gen_art.sh tools/art_prompts/medieval.
   - `pet.py` 移植自它的 `桌宠.py`，包括台词、散步 / 跟随逻辑、喂食、AI 对话、天气、系统监控、菜单。其中 AI 对话、天气、系统监控由 [Cpanoe](https://github.com/Cpanoe) 贡献给原项目。
   - 在此基础上的改动：macOS 适配（鼠标穿透改用 Qt 自带标志、开机自启改用 LaunchAgent、字体按平台选、窗口不用 Tool 标志）；天气查询改到后台线程；修复了双击后会多触发一次单击的问题；新增表情系统和飞行棋切换。
   - 它的原始许可证保留在 [`LICENSE-dafeiyu-pet`](LICENSE-dafeiyu-pet)。
-- **[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)**（代码 MIT）：DeepSeek Harness 桌宠。
-  - `content/clips/` 的 92 段动作动画取自它的 `dsh-pet/assets/webm`（提交 `dfc0396`），文件原样未改；分类沿用它 `config.jsonc` 里的随机动作分类。
-  - 按它的说明，素材（动画 / 提示词 / 源视频）允许开源使用、**禁止商用**；它的许可证保留在 [`LICENSE-dsh-pet`](LICENSE-dsh-pet)。
-- 「鲸鱼娘·大肥鱼」是 DeepSeek 社区的二创形象，角色形象的权利归原作者 / 相关权利人。
+- **[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)**：DeepSeek Harness 桌宠。它的代码和素材是分开授权的：
+  - 代码 MIT，许可证保留在 [`LICENSE-dsh-pet`](LICENSE-dsh-pet)。本项目只沿用了它 `config.jsonc` 里的随机动作分类（`content/clips/clips.json`）。
+  - `content/clips/` 的 92 段动作动画取自它的 `dsh-pet/assets/webm`（提交 `dfc0396`），文件原样未改。**这些动画不适用 MIT**：
+    素材允许开源使用、**禁止商用**，角色形象另受 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 约束；署名和条款详见 [`content/clips/LICENSE.md`](content/clips/LICENSE.md)。
+- 「鲸鱼娘·大肥鱼」是 DeepSeek 社区的二创形象（非 DeepSeek 官方形象），角色形象的权利归原作者 / 相关权利人；
+  形象作者声明其适用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)，作者署名见 [`content/clips/LICENSE.md`](content/clips/LICENSE.md)。
   本项目为非商业同人作品，如需商用请先联系素材作者。
 - 格子玩法灵感来自飞行棋和大富翁。
 - 界面使用 [PySide6](https://doc.qt.io/qtforpython-6/)（Qt for Python，LGPL）。
@@ -165,4 +167,4 @@ STYLE_REF=/path/to/动森截图.png tools/gen_art.sh tools/art_prompts/medieval.
 ## 协议
 
 本项目代码采用 [MIT](LICENSE) 协议；`sprites/` 目录和移植自 dafeiyu-pet 的代码同时沿用上游的 MIT 许可，并受上面的角色形象说明约束。
-`content/clips/` 的动作动画沿用 dsh-pet 的素材条款（开源可用、禁止商用）。
+`content/clips/*.webm` 的动作动画**不在 MIT 范围内**：沿用 dsh-pet 的素材条款（开源可用、禁止商用），角色形象适用 CC BY-NC-SA 4.0，见 [`content/clips/LICENSE.md`](content/clips/LICENSE.md)。

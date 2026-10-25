@@ -152,5 +152,62 @@ class ClipPlayerTest(unittest.TestCase):
         self.assertFalse(p.active)
 
 
+@unittest.skipIf(_SKIP, _SKIP)
+class PetClipFallbackTest(unittest.TestCase):
+    """桌宠播着撑大窗口的动画 A，再切到打不开的 B：窗口缩回三视图，脚底不动。"""
+
+    def setUp(self):
+        from PySide6.QtWidgets import QApplication
+        from common import DEFAULT_CFG
+        from pet import PetWindow
+        self.app = QApplication.instance() or QApplication([])
+        self.pet = PetWindow(mock.Mock(), dict(DEFAULT_CFG))
+        self.pet.timer.stop()   # 不让 tick 在测试中途推进动画
+        self.pet.move(400, 300)
+        self.base = self.pet.size()
+        widest = max(clips.CLIPS, key=lambda n: clips.CLIPS[n]["crop"][2])
+        self.wide, self.broken = widest, next(n for n in clips.CLIPS if n != widest)
+        self.tmp = tempfile.mkdtemp()
+        for name, info in clips.CLIPS.items():
+            src = os.path.join(clips.CLIP_DIR, info["file"])
+            dst = os.path.join(self.tmp, info["file"])
+            if name == self.broken:
+                with open(dst, "wb") as f:
+                    f.write(b"not a webm" * 64)
+            else:
+                os.symlink(src, dst)
+        patcher = mock.patch.object(clips, "CLIP_DIR", self.tmp)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def tearDown(self):
+        self.pet.clip.stop()
+        self.pet.close()
+        shutil.rmtree(self.tmp)
+
+    def test_failed_switch_restores_window(self):
+        pet = self.pet
+        self.assertTrue(pet.play_clip(self.wide))
+        self.assertGreater(pet.width(), self.base.width())
+        foot = pet.foot_global()
+        self.assertFalse(pet.play_clip(self.broken))
+        self.assertFalse(pet.clip.active)
+        self.assertEqual(pet.size(), self.base)
+        self.assertEqual(pet.foot_global(), foot)
+
+    def test_random_falls_back_to_expression(self):
+        pet = self.pet
+        choice = clips.random.choice   # 只把「随机抽动画」钉到打不开的那段，抽表情照旧
+
+        def pick(seq):
+            return self.broken if self.broken in seq else choice(seq)
+        with mock.patch("pet.random.random", return_value=0.0), \
+                mock.patch("random.choice", side_effect=pick):
+            pet.play_random()
+        self.assertFalse(pet.clip.active)
+        self.assertTrue(pet.expr.active)
+        self.assertEqual(pet.size(), self.base)
+
+
 if __name__ == "__main__":
     unittest.main()

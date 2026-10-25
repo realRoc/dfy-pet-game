@@ -621,8 +621,8 @@ class PetWindow(QWidget):
                 # 偶尔自己冒个表情，不说话
                 self.expr.start()
             elif pick < 0.8:
-                if clips.AVAILABLE:
-                    self.play_clip()
+                if not (clips.AVAILABLE and self.play_clip()):
+                    self.expr.start()
             elif pick < 0.9:
                 if self.t - self.last_speak_tick >= 1500:
                     self.last_speak_tick = self.t
@@ -654,23 +654,24 @@ class PetWindow(QWidget):
         self.say(line)
 
     def play_clip(self, name=None):
-        """播一段动作动画（不传则随机）。"""
+        """播一段动作动画（不传则随机），返回播没播起来。"""
         self.expr.stop()
         self.chat_paused = False
         self.jump_t = 0
         self.action = None
         self._set_dir("down", 1)
         self.cross_t = 0.0
-        if self.clip.start(name):
-            self._relayout()
+        # start() 会先停掉正在播的那段：新的打不开时窗口也要缩回三视图，不能留着撑大的透明区挡鼠标
+        ok = self.clip.start(name) is not None
+        self._relayout()
+        return ok
 
     def play_random(self):
-        """「做个表情 → 随机」：表情和动作动画一起抽。"""
+        """「做个表情 → 随机」：表情和动作动画一起抽，动画打不开就换成表情。"""
         n = len(EXPRESSIONS)
-        if clips.AVAILABLE and random.random() < len(clips.CLIPS) / (n + len(clips.CLIPS)):
-            self.play_clip()
-        else:
-            self.play_expression()
+        if clips.AVAILABLE and random.random() < len(clips.CLIPS) / (n + len(clips.CLIPS)) and self.play_clip():
+            return
+        self.play_expression()
 
     def stop_clip(self):
         if self.clip.active:
