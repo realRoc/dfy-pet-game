@@ -1,0 +1,22 @@
+# 奶油骰子：有倒角的奶油白立方体、深蓝凹点、统一光源、柔软落影。
+# 动画：按下压缩 → 弹起旋转 → 落地回弹 → 读点数，结果在按下时就定了。
+
+name = "奶油立方"
+style = "cube"
+size = 78
+radius = 18
+body = "#FBF5E8"
+side = "#E3D6BC"
+border_hot = "#284D79"
+border_idle = "#A9B1C2"
+pip = "#284D79"
+pip_one = "#284D79"
+pip_r = 8.5
+pip_one_r = 11
+pip_spread = 22
+shadow_alpha = 60
+press_time = 0.10
+spin_time = 0.45
+land_time = 0.18
+read_time = 0.18
+lift = 70

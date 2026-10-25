@@ -1,0 +1,274 @@
+# 格子类型：外观 + 落地事件
+# 落地时从 events 里随机抽一条：coins 加减小鱼干，say 是台词，skip_next 让下回合暂停。
+# symbol 是石板上画的矢量符号（stone 风格地图用），desc 是悬停时显示的说明。
+# 钓鱼、医院、商店、像素、森林的玩法还没做，先只说一句话，不发占位奖励。
+
+[types.start]
+name = "起点"
+icon = "🏁"
+color = "#FFD666"
+symbol = "flag"
+desc = "经过起点 +3 小鱼干"
+
+[types.mystery]
+name = "问号"
+icon = "❓"
+color = "#78D7CD"
+symbol = "question"
+desc = "随机做一个表情"
+random_expression = true
+
+[types.rest]
+name = "休息"
+icon = "🛋️"
+color = "#C8BEF5"
+symbol = "bench"
+desc = "坐一会儿，说句话"
+events = [
+  { say = "躺一会儿，心情回满～" },
+  { say = "大肥鱼坐的住" },
+]
+
+[types.chest]
+name = "宝箱"
+icon = "🎁"
+color = "#FFC878"
+symbol = "chest"
+desc = "开宝箱拿小鱼干"
+events = [
+  { coins = 3, say = "宝箱里是钻石？！+3" },
+  { coins = 1, say = "开出一个小发卡 +1" },
+  { coins = 2, say = "金币闪闪 +2" },
+]
+
+# ---------- 经典外圈用 ----------
+
+[types.fish]
+name = "钓鱼"
+icon = "🎣"
+color = "#8CC8FF"
+symbol = "hook"
+events = [
+  { coins = 2, say = "钓到星星小鱼！+2 小鱼干" },
+  { coins = 1, say = "钓到一只迷你鱼……也算吧 +1" },
+]
+
+[types.ring]
+name = "套圈"
+icon = "🎯"
+color = "#FFAAA0"
+events = [
+  { coins = 1, say = "套中了！小勋章到手 +1" },
+  { coins = 0, say = "差一点点……下次一定" },
+]
+
+[types.candy]
+name = "接糖果"
+icon = "🍬"
+color = "#FFBEE1"
+events = [
+  { coins = 1, say = "接住糖果！甜到冒泡泡～ +1" },
+  { coins = 2, say = "糖果雨！嘎嘣脆 +2" },
+]
+
+[types.riddle]
+name = "猜谜"
+icon = "🧩"
+color = "#B4E1A0"
+events = [
+  { coins = 1, say = "答对了！我果然是大聪明 +1" },
+  { coins = 0, say = "这题超纲了，我先去吃饭" },
+]
+
+[types.prank]
+name = "恶作剧"
+icon = "😼"
+color = "#BEBECD"
+events = [
+  { say = "被泡泡裹住了！下回合歇着……", skip_next = true },
+]
+
+# ---------- 环岛日记用 ----------
+
+[types.supply]
+name = "补给"
+icon = "🐟"
+color = "#F4EBD6"
+symbol = "fish"
+desc = "落点 +1 小鱼干"
+events = [
+  { coins = 1, say = "捡到一包小鱼干 +1" },
+  { coins = 1, say = "补给站塞给我一条鱼干 +1" },
+]
+
+[types.fishing]
+name = "钓鱼点"
+icon = "🎣"
+color = "#9CCBE8"
+symbol = "hook"
+desc = "钓鱼小游戏施工中"
+events = [
+  { say = "鱼还在睡觉……钓鱼小游戏施工中 🎣" },
+  { say = "我先看看湖，下次带鱼竿来" },
+]
+
+[types.forest]
+name = "森林驿站"
+icon = "🍄"
+color = "#B3D6A4"
+symbol = "leaf"
+desc = "采集选择施工中"
+events = [
+  { say = "蘑菇说它还没长好，下次再采" },
+  { say = "森林里好凉快，散个步就走" },
+]
+
+[types.shop]
+name = "小镇商店"
+icon = "🛍️"
+color = "#F2C9A6"
+symbol = "shop"
+desc = "商店施工中"
+events = [
+  { say = "老板还在进货，商店过几天开张" },
+]
+
+[types.pixel]
+name = "像素遗迹"
+icon = "👾"
+color = "#BBA9E0"
+symbol = "pixel"
+desc = "像素化状态施工中"
+events = [
+  { say = "这里有股方块味……先不碰" },
+  { say = "地上的草怎么是一格一格的？" },
+]
+
+[types.hospital]
+name = "医院"
+icon = "🏥"
+color = "#A6DDCB"
+symbol = "cross"
+desc = "治疗施工中"
+events = [
+  { say = "医生说我很健康，回去吧" },
+]
+
+[types.story]
+name = "路牌"
+icon = "🪧"
+color = "#EADFC4"
+symbol = "sign"
+desc = "一句轻故事"
+events = [
+  { say = "路牌上写着：前方蘑菇，请勿食用" },
+  { say = "有人在树上刻了：大肥鱼到此一游" },
+  { say = "糖果摊老板说明天进新口味" },
+]
+
+[types.fork]
+name = "路口"
+icon = "🔀"
+color = "#EADFC4"
+symbol = "fork"
+desc = "森林 / 像素桥路口（分支施工中）"
+events = [
+  { say = "左边是森林，右边有座紫色小桥……今天先走大路" },
+]
+
+# ---------- 中世纪小岛：特殊地点 ----------
+# 事件积木：coins / say / expression（表情 key 或 random）/ move（正数前进、负数后退）/ warp（传送到某类格子）/ skip_next / weight
+
+[types.city]
+name = "主城"
+icon = "🏰"
+color = "#E8A68C"
+desc = "集市、吟游诗人和面包房"
+events = [
+  { coins = 2, say = "帮集市商人吆喝了一嗓子，赚了 2 小鱼干" },
+  { expression = "happy", say = "广场上的吟游诗人给大肥鱼唱了首歌～" },
+  { coins = -1, say = "面包房的可颂太香了，没忍住 -1" },
+]
+
+[types.gyroid]
+name = "陶俑小路"
+icon = "🏺"
+color = "#E3A877"
+desc = "陶俑会一起摇摆，偶尔把你往前推"
+events = [
+  { expression = "random", say = "陶俑们咕噜咕噜一起摇摆，大肥鱼也跟着跳" },
+  { coins = 1, say = "挖出一个小陶俑，卖给博物馆 +1" },
+  { move = 1, say = "陶俑咕噜一声，把你往前推了一格" },
+]
+
+[types.ruins]
+name = "古城遗迹"
+icon = "🏛️"
+color = "#B9AFA3"
+desc = "能挖到古钱币，也可能踩到机关"
+events = [
+  { coins = 3, say = "在断墙底下挖到古钱币 +3" },
+  { move = -2, expression = "shocked", say = "踩到机关了！被石球追着退了两格" },
+  { expression = "shocked", say = "那尊石像……刚才是不是动了一下？" },
+]
+
+[types.witch]
+name = "女巫森林"
+icon = "🧙"
+color = "#7B7FB8"
+desc = "女巫的扫帚和来路不明的魔药"
+events = [
+  { move = 3, expression = "smug", say = "女巫借我扫帚，嗖地飞了三格！" },
+  { coins = -2, expression = "cry", say = "喝了魔药变成青蛙，花 2 小鱼干才变回来" },
+  { expression = "confused", say = "坩埚咕嘟咕嘟……好像什么也没发生" },
+]
+
+[types.harbor]
+name = "港口"
+icon = "⚓"
+color = "#7FA6CF"
+desc = "帮渔夫卸货，或者搭船去湖心岛"
+events = [
+  { coins = 2, say = "帮渔夫卸了一船货 +2" },
+  { warp = "lake_isle", expression = "happy", say = "船长说顺路，坐运河小船去湖心岛！" },
+  { expression = "shocked", say = "远处海面上……那是海盗旗吗？" },
+]
+
+[types.lake_isle]
+name = "湖心岛"
+icon = "🏝️"
+color = "#8FD3C1"
+desc = "湖心亭钓金鱼、看日落"
+events = [
+  { coins = 3, say = "在湖心亭钓到一条金鱼 +3" },
+  { expression = "love", say = "坐在凉亭里看日落，好安静" },
+  { coins = -1, say = "往许愿池里扔了 1 小鱼干，许愿天天有鱼干" },
+]
+
+[types.field]
+name = "田野"
+icon = "🌾"
+color = "#E6C66E"
+desc = "帮农夫收麦子，小心稻草人"
+events = [
+  { coins = 2, say = "帮农夫收麦子 +2" },
+  { coins = 1, say = "风车底下捡到一袋面粉 +1" },
+  { expression = "shocked", say = "稻草人：别踩我的麦子！" },
+]
+
+[types.lavender]
+name = "薰衣草田"
+icon = "💜"
+color = "#B49AE0"
+desc = "香香的，容易睡着"
+events = [
+  { skip_next = true, expression = "sleepy", say = "躺在薰衣草里睡着了……下回合歇着" },
+  { coins = 2, say = "画家把大肥鱼画进了画里，给了 2 小鱼干" },
+  { expression = "love", say = "薰衣草好香，心情满满～" },
+]
+
+[types.blank]
+name = "空白格"
+icon = "▫️"
+color = "#EFE7D6"
+desc = "还没想好放什么"
