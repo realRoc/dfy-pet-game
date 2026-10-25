@@ -33,6 +33,8 @@ from game.render.tile_renderer import TileRenderer
 
 # ===== 动画参数（秒）=====
 TICK_MS = 16
+IDLE_TICK_MS = 80          # 没有动画时降到每秒十来帧，只够大肥鱼呼吸
+MAX_DT = 0.1               # 卡顿时最多补这么多时间，免得一下跳太远
 HOP_TIME = 0.26
 HOP_HEIGHT = 40
 LAND_TIME = 0.18
@@ -118,9 +120,9 @@ class BoardWindow(QWidget):
         self.clock.start()
         self.last_ms = 0
         self.now = 0.0
+        self.was_busy = True
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
-        self.timer.start(TICK_MS)
 
     def load_content(self):
         """（重新）加载地图、格子、骰子，并按新地图调整窗口和镜头。"""
@@ -323,6 +325,28 @@ class BoardWindow(QWidget):
     # ---------- 交互 ----------
     def say(self, text, secs=2.6):
         self.bubble_text, self.bubble_left = text, secs
+        self.wake()
+
+    def wake(self):
+        """有输入或新动画：马上整窗重画，恢复满帧。"""
+        self.was_busy = True
+        if self.timer.interval() != TICK_MS:
+            self.timer.setInterval(TICK_MS)
+        self.update()
+
+    def animating(self):
+        """掷骰 / 移动 / 选路 / 事件、镜头没停稳、气泡 / 表情 / 光圈还在播，就要满帧整窗重画。"""
+        if self.state != "idle" or self.expr.active:
+            return True
+        if max(self.fade_t, self.land_t, self.glow_t) > 0 or (self.bubble_left > 0 and self.bubble_text):
+            return True
+        return not self.cam_free and self.cam != self.clamp_cam(self.fish_focus())
+
+    def fish_rect(self):
+        """空闲时画面上只有大肥鱼在呼吸，只重画它这一块（留出影子和左右摆动的余量）。"""
+        h = self.fish_h
+        box = QRectF(self.fish_xy.x() - h * 0.55, self.fish_xy.y() - h * 1.15, h * 1.1, h * 1.15 + 14)
+        return self.upright_rect(box, self.ground_point()).adjusted(-4, -4, 4, 4).toAlignedRect()
 
     def roll(self):
         if self.state != "idle":
@@ -476,6 +500,7 @@ class BoardWindow(QWidget):
     def mousePressEvent(self, e):
         if e.button() != Qt.MouseButton.LeftButton:
             return
+        self.wake()
         pos = e.position()
         if self.collapse_rect().contains(pos):
             self.collapse()
@@ -511,6 +536,7 @@ class BoardWindow(QWidget):
             return
         if self.press_btn == "minimap":
             self.jump_minimap(pos)
+            self.wake()
             return
         if self.pan_from is not None:
             start, cam0 = self.pan_from
@@ -518,8 +544,12 @@ class BoardWindow(QWidget):
             if self.cam_free or math.hypot(d.x(), d.y()) > 4:
                 self.cam = self.clamp_cam(cam0 - QPointF(d.x() / self.zoom, d.y() / (self.zoom * self.tilt)))
                 self.cam_free = True
+                self.wake()
             return
-        self.hover_node = self.node_at(pos)
+        node = self.node_at(pos)
+        if node != self.hover_node:
+            self.hover_node = node
+            self.wake()
 
     def mouseReleaseEvent(self, e):
         pos = e.position()
@@ -529,6 +559,7 @@ class BoardWindow(QWidget):
         self.press_btn = None
         self.drag_off = None
         self.pan_from = None
+        self.wake()
 
     def wheelEvent(self, e):
         if not self.is_big():
@@ -536,14 +567,18 @@ class BoardWindow(QWidget):
         steps = e.angleDelta().y() / 120
         self.set_zoom(self.zoom * (1.12 ** steps), e.position())
         self.cam_free = True
+        self.wake()
 
     def leaveEvent(self, _):
-        self.hover_node = None
+        if self.hover_node is not None:
+            self.hover_node = None
+            self.wake()
 
     def keyPressEvent(self, e):
         k = e.key()
         if e.isAutoRepeat() and k not in (Qt.Key.Key_Left, Qt.Key.Key_Right):
             return
+        self.wake()
         if self.state == "choose":
             if k in (Qt.Key.Key_Left, Qt.Key.Key_Up):
                 self.choice_idx = (self.choice_idx - 1) % len(self.choices)
@@ -600,11 +635,23 @@ class BoardWindow(QWidget):
         a.setEnabled(not busy)
         m.addAction("退出", self.app.quit)
         m.exec(e.globalPos())
+        self.wake()
+
+    # 收起棋盘（回到桌宠）时整个停掉，不再每 16ms 醒一次
+    def showEvent(self, e):
+        self.last_ms = self.clock.elapsed()
+        self.was_busy = True
+        self.timer.start(TICK_MS)
+        super().showEvent(e)
+
+    def hideEvent(self, e):
+        self.timer.stop()
+        super().hideEvent(e)
 
     # ---------- 逻辑 ----------
     def tick(self):
         ms = self.clock.elapsed()
-        dt = min(0.05, (ms - self.last_ms) / 1000.0)
+        dt = min(MAX_DT, (ms - self.last_ms) / 1000.0)
         self.last_ms = ms
         if not self.isVisible():
             return
@@ -659,9 +706,20 @@ class BoardWindow(QWidget):
 
         if not self.cam_free:
             target = self.clamp_cam(self.fish_focus())
-            self.cam += (target - self.cam) * min(1.0, dt * CAM_FOLLOW)
+            d = target - self.cam
+            # 追到很近就直接贴上，镜头停稳了才能降频
+            self.cam = target if abs(d.x()) + abs(d.y()) < 0.3 else self.cam + d * min(1.0, dt * CAM_FOLLOW)
         self.cam = self.clamp_cam(self.cam)
-        self.update()
+
+        busy = self.animating()
+        if busy or self.was_busy:
+            self.update()           # 刚停下的这一帧也整窗画，擦掉消失的气泡和光圈
+        else:
+            self.update(self.fish_rect())
+        self.was_busy = busy
+        interval = TICK_MS if busy else IDLE_TICK_MS
+        if self.timer.interval() != interval:
+            self.timer.setInterval(interval)
 
     def tick_forced(self):
         """事件推着走：沿 forced_nodes 一格格跳，不结算格子。"""
@@ -706,7 +764,7 @@ class BoardWindow(QWidget):
             self.glow_node, self.glow_t = self.board.node_id, 1.0
 
     # ---------- 绘制 ----------
-    def paintEvent(self, _):
+    def paintEvent(self, e):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
@@ -724,12 +782,14 @@ class BoardWindow(QWidget):
         p.translate(self.width() / 2, self.height() / 2)
         p.scale(self.zoom, self.zoom * self.tilt)
         p.translate(-self.cam.x(), -self.cam.y())
-        view = self.view_rect()
+        # 只画要重画的区域（空闲时只有大肥鱼那一块）
+        dirty = QRectF(e.rect())
+        view = QRectF(self.to_world(dirty.topLeft()), self.to_world(dirty.bottomRight()))
         self.map_painter.paint_ground_cached(p, view, math.ceil(self.zoom * 4) / 4, dpr, self.tilt)
         p.restore()
 
         # 格子、建筑、角色：直立地画在脚底的投影位置
-        screen = QRectF(self.rect()).adjusted(-40, -40, 40, 40)
+        screen = dirty.adjusted(-40, -40, 40, 40)
         mark = 0.5 + 0.5 * math.sin(self.now * 6)
         for nid in sorted(self.graph.nodes, key=lambda n: self.graph.anchor(n)[1]):
             rc, c = self.tile_rect(nid), QPointF(*self.graph.anchor(nid))
@@ -750,10 +810,12 @@ class BoardWindow(QWidget):
         p.restore()
 
         self.paint_choices(p)
-        self.paint_hud(p)
-        if self.is_big():
+        if dirty.top() <= self.home_btn_rect().bottom() + 2:
+            self.paint_hud(p)
+        if self.is_big() and dirty.intersects(self.minimap_rect().adjusted(-6, -6, 6, 6)):
             self.paint_minimap(p)
-        self.paint_tray(p)
+        if dirty.bottom() >= self.tray_rect().top() - 2:
+            self.paint_tray(p)
         self.paint_bubble(p)
 
     def paint_world_objects(self, p, screen, device_scale):

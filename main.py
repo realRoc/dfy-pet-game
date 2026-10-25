@@ -10,7 +10,7 @@ import sys
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
 
-from common import SPRITE_DIR, load_config, save_config
+from common import APP_NAME, SPRITE_DIR, load_config, save_config, relaunch_in_mac_app
 from board_game import BoardWindow
 from pet import PetWindow, TICK
 
@@ -24,7 +24,7 @@ class PetApp:
 
         # 托盘（macOS 是菜单栏图标）：鼠标穿透后从这里解除
         self.tray = QSystemTrayIcon(self.pet.icon, self.pet)
-        self.tray.setToolTip("大肥鱼飞行棋")
+        self.tray.setToolTip(APP_NAME)
         self.tray.setContextMenu(self.pet._build_menu())
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
@@ -98,9 +98,10 @@ class PetApp:
 
 
 def main():
+    relaunch_in_mac_app()
     qapp = QApplication(sys.argv)
     qapp.setQuitOnLastWindowClosed(False)
-    qapp.setApplicationName("大肥鱼飞行棋")
+    qapp.setApplicationName(APP_NAME)
     qapp.setWindowIcon(QIcon(os.path.join(SPRITE_DIR, "icon.png")))
     app = PetApp(qapp)
     qapp.aboutToQuit.connect(lambda: save_config(app.cfg))
@@ -113,7 +114,7 @@ if __name__ == "__main__":
     except Exception as ex:
         try:
             qapp = QApplication.instance() or QApplication(sys.argv)
-            QMessageBox.critical(None, "大肥鱼飞行棋出错", str(ex))
+            QMessageBox.critical(None, f"{APP_NAME}出错", str(ex))
         except Exception:
             pass
         raise

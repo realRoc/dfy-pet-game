@@ -79,8 +79,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-在 macOS 上，程序名和程序坞图标目前显示为 Python。
-
 ## 文件
 
 | 文件 | 说明 |
@@ -104,6 +102,7 @@ python main.py
 | `common.py` | 路径、平台差异（字体、窗口标志）、配置、精灵加载 |
 | `sprites/` | 精灵图（来自 dafeiyu-pet） |
 | `启动大肥鱼飞行棋.command` | macOS 双击启动脚本 |
+| `build/大肥鱼.app` | macOS 上启动时自动生成：把解释器放进这个壳里运行，程序坞和 ⌘Tab 就显示「大肥鱼」而不是 Python |
 
 ## 换地图 / 换骰子皮肤
 
