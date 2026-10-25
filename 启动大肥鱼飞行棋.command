@@ -1,8 +1,8 @@
 #!/bin/bash
-# macOS 双击启动：第一次会自动建虚拟环境并安装 PySide6-Essentials（约 360 MB），之后秒开。
+# macOS 双击启动：第一次会自动建虚拟环境并安装 PySide6-Essentials、PyAV 等依赖（约 400 MB），之后秒开。
 cd "$(dirname "$0")" || exit 1
 
-if [ ! -x .venv/bin/python ] || ! .venv/bin/python -c "import PySide6, requests, psutil, game.content" 2>/dev/null; then
+if [ ! -x .venv/bin/python ] || ! .venv/bin/python -c "import PySide6, requests, psutil, av, game.content" 2>/dev/null; then
   if ! command -v python3 >/dev/null 2>&1; then
     echo "没找到 python3，请先安装：https://www.python.org/downloads/macos/ 或 brew install python"
     read -r -p "按回车退出"

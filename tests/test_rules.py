@@ -1,4 +1,5 @@
 """纯规则与内容加载测试，不需要窗口。运行：python -m unittest discover tests"""
+import json
 import os
 import random
 import shutil
@@ -377,10 +378,25 @@ class MedievalTest(unittest.TestCase):
 
     def test_event_expressions_exist(self):
         from expressions import EXPRESSIONS
+        with open(os.path.join(CONTENT_DIR, "clips", "clips.json"), encoding="utf-8") as f:
+            clips = json.load(f)["clips"]
         for t in self.tiles.values():
             for ev in t.events:
-                self.assertTrue(ev.expression in ("", "random") or ev.expression in EXPRESSIONS,
-                                f"{t.id}: {ev.expression}")
+                self.assertTrue(ev.expression in ("", "random") or ev.expression in EXPRESSIONS
+                                or ev.expression in clips, f"{t.id}: {ev.expression}")
+
+    def test_clip_manifest(self):
+        """动作动画清单：分类里的每段都有记录、文件都在、外框在画面内。"""
+        clip_dir = os.path.join(CONTENT_DIR, "clips")
+        with open(os.path.join(clip_dir, "clips.json"), encoding="utf-8") as f:
+            manifest = json.load(f)
+        listed = [n for c in manifest["categories"] for n in c["clips"]]
+        self.assertEqual(sorted(listed), sorted(manifest["clips"]))
+        for name, info in manifest["clips"].items():
+            self.assertTrue(os.path.exists(os.path.join(clip_dir, info["file"])), name)
+            x, y, w, h = info["crop"]
+            self.assertTrue(w > 0 and h > 0 and x >= 0 and y >= 0, name)
+            self.assertGreater(info["frames"], 0, name)
 
     def test_bad_event_field_rejected(self):
         root = tempfile.mkdtemp()

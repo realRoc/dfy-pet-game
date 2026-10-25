@@ -177,7 +177,7 @@ events = [
 ]
 
 # ---------- 中世纪小岛：特殊地点 ----------
-# 事件积木：coins / say / expression（表情 key 或 random）/ move（正数前进、负数后退）/ warp（传送到某类格子）/ skip_next / weight
+# 事件积木：coins / say / expression（表情 key、动作动画名或 random；动作动画见 content/clips/clips.json）/ move（正数前进、负数后退）/ warp（传送到某类格子）/ skip_next / weight
 
 [types.city]
 name = "主城"
@@ -188,6 +188,7 @@ events = [
   { coins = 2, say = "帮集市商人吆喝了一嗓子，赚了 2 小鱼干" },
   { expression = "happy", say = "广场上的吟游诗人给大肥鱼唱了首歌～" },
   { coins = -1, say = "面包房的可颂太香了，没忍住 -1" },
+  { expression = "舞狮头", say = "集市上在舞狮，大肥鱼也顶着狮头蹦起来！" },
 ]
 
 [types.gyroid]
@@ -221,6 +222,7 @@ events = [
   { move = 3, expression = "smug", say = "女巫借我扫帚，嗖地飞了三格！" },
   { coins = -2, expression = "cry", say = "喝了魔药变成青蛙，花 2 小鱼干才变回来" },
   { expression = "confused", say = "坩埚咕嘟咕嘟……好像什么也没发生" },
+  { expression = "变鸽子", say = "女巫教了个戏法：帽子里变出鸽子！" },
 ]
 
 [types.harbor]
@@ -243,6 +245,7 @@ events = [
   { coins = 3, say = "在湖心亭钓到一条金鱼 +3" },
   { expression = "love", say = "坐在凉亭里看日落，好安静" },
   { coins = -1, say = "往许愿池里扔了 1 小鱼干，许愿天天有鱼干" },
+  { expression = "放河灯", say = "在湖边放了一盏河灯，许个愿" },
 ]
 
 [types.field]
@@ -254,6 +257,7 @@ events = [
   { coins = 2, say = "帮农夫收麦子 +2" },
   { coins = 1, say = "风车底下捡到一袋面粉 +1" },
   { expression = "shocked", say = "稻草人：别踩我的麦子！" },
+  { expression = "放风筝", say = "田埂上风好大，放个风筝～" },
 ]
 
 [types.lavender]
