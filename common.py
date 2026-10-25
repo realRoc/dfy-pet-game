@@ -36,12 +36,12 @@ DEFAULT_CFG = {
     "board_open": True,
     "board_x": None,
     "board_y": None,
-    "board_map": "classic",     # content/maps/ 下的地图目录名
+    "board_map": "medieval",    # content/maps/ 下的地图目录名
     "board_node": None,         # 当前节点 id；为空时从旧字段 board_pos 换算
     "board_pos": 0,
     "board_coins": 0,
     "board_turn": 0,
-    "dice_skin": "classic",     # content/dice/ 下的皮肤目录名
+    "dice_skin": None,          # content/dice/ 下的皮肤目录名；为空时用地图默认的骰子
 }
 
 

@@ -1,0 +1,422 @@
+# 环岛日记：一座比窗口大很多的岛，镜头跟着大肥鱼走。
+# 世界坐标是画布像素（canvas 3600×2600），窗口默认 1080×709，一次只看到一部分。
+#
+# 路线用 [[road]] 描述：沿 points 画一条平滑道路，nodes 里的格子沿路等距排开，
+# 节点 id = 道路 id + 两位序号（a00、a01……）。from / to 把道路接到别的节点上；
+# 多条道路 from 同一个节点就是岔路，写在前面的是默认方向。
+# 建筑、树木等是 content/art/island/ 下的贴图（Codex image_gen 生成，见 tools/import_art.py）。
+
+name = "环岛日记"
+subtitle = "环岛日记"
+start = "a00"
+canvas = [3600, 2600]
+window = [1080, 709]
+zoom = 0.7
+tile = 96
+fish_h = 120
+dice = "cream"
+tile_style = "sprite"
+path_width = 46
+art_dir = "island"
+
+# ---------- 路线 ----------
+
+[[road]]
+id = "a"
+zone = "海边小屋"
+points = [[620, 2150], [520, 1980], [470, 1780], [520, 1580], [620, 1400], [660, 1230], [760, 1080]]
+nodes = ["start", "supply", "rest", "fishing", "supply", "chest", "story", "supply", "fork"]
+
+[[road]]
+id = "b"
+zone = "蘑菇森林"
+from = "a08"
+to = "c00"
+points = [[760, 1080], [700, 880], [780, 660], [980, 520], [1220, 480], [1440, 560], [1600, 700], [1700, 820]]
+nodes = ["supply", "chest", "forest", "supply", "rest", "story", "chest", "supply", "mystery"]
+
+[[road]]
+id = "p"
+zone = "像素小桥"
+from = "a08"
+to = "c00"
+points = [[760, 1080], [960, 1080], [1180, 1060], [1400, 1000], [1580, 900], [1700, 820]]
+nodes = ["supply", "supply", "pixel", "chest", "mystery"]
+
+[[road]]
+id = "c"
+zone = "小镇大道"
+points = [[1700, 820], [1900, 700], [2150, 640], [2400, 660], [2650, 620], [2900, 560], [3120, 640],
+          [3180, 840], [3160, 1080], [3060, 1300], [2920, 1460]]
+nodes = ["supply", "story", "supply", "shop", "rest", "mystery", "supply", "chest", "rest", "supply",
+         "story", "supply", "hospital", "supply", "mystery", "supply", "fork"]
+
+[[road]]
+id = "d"
+zone = "海湾栈道"
+from = "c16"
+to = "e00"
+points = [[2920, 1460], [3000, 1700], [2900, 1950], [2650, 2150], [2350, 2250], [2000, 2150]]
+nodes = ["supply", "supply", "chest", "supply", "rest", "supply", "mystery"]
+
+[[road]]
+id = "g"
+zone = "花园小路"
+from = "c16"
+to = "e00"
+points = [[2920, 1460], [2700, 1400], [2450, 1450], [2250, 1600], [2150, 1800], [2000, 2000], [2000, 2150]]
+nodes = ["story", "chest", "rest", "supply", "chest", "story", "supply", "mystery", "supply"]
+
+[[road]]
+id = "e"
+zone = "回家的路"
+to = "a00"
+points = [[2000, 2150], [1700, 2250], [1400, 2280], [1100, 2250], [850, 2200], [620, 2150]]
+nodes = ["supply", "chest", "supply", "rest", "mystery", "supply", "story", "supply", "supply"]
+
+# ---------- 贴图 ----------
+
+[textures]
+grass = "tex_grass.webp"
+sand = "tex_sand.webp"
+water = "tex_water.webp"
+cliff = "tex_cliff.webp"
+path = "tex_path.webp"
+
+[tile_sprites]
+start = "tile_flag"
+supply = "tile_fish"
+fishing = "tile_hook"
+chest = "tile_chest"
+rest = "tile_bench"
+story = "tile_sign"
+fork = "tile_fork"
+forest = "tile_leaf"
+shop = "tile_shop"
+pixel = "tile_pixel"
+hospital = "tile_cross"
+mystery = "tile_question"
+
+# h 是贴图在世界里的高度；foot 是脚底在图里的位置（默认 [0.5, 0.94]）
+[sprites]
+house_start = { file = "house_start.webp", h = 300 }
+dock = { file = "dock.webp", h = 190 }
+forest_station = { file = "forest_station.webp", h = 300 }
+pixel_ruins = { file = "pixel_ruins.webp", h = 300 }
+shop = { file = "shop.webp", h = 290 }
+hospital = { file = "hospital.webp", h = 290 }
+candy_stall = { file = "candy_stall.webp", h = 210 }
+lighthouse = { file = "lighthouse.webp", h = 390, foot = [0.5, 0.95] }
+fountain = { file = "fountain.webp", h = 220 }
+boat = { file = "boat.webp", h = 120, foot = [0.5, 0.8] }
+whale = { file = "whale.webp", h = 340, foot = [0.5, 0.85] }
+bridge = { file = "bridge.webp", h = 130, foot = [0.5, 0.8] }
+tree_round = { file = "tree_round.webp", h = 270 }
+palm = { file = "palm.webp", h = 280 }
+mushroom_tree = { file = "mushroom_tree.webp", h = 230 }
+pixel_tree = { file = "pixel_tree.webp", h = 220 }
+bush = { file = "bush.webp", h = 110 }
+rocks = { file = "rocks.webp", h = 110 }
+bench = { file = "bench.webp", h = 90 }
+signpost = { file = "signpost.webp", h = 140 }
+chest_prop = { file = "chest.webp", h = 80 }
+tile_flag = { file = "tile_00.webp", h = 96 }
+tile_fish = { file = "tile_01.webp", h = 96 }
+tile_hook = { file = "tile_02.webp", h = 96 }
+tile_chest = { file = "tile_03.webp", h = 96 }
+tile_bench = { file = "tile_04.webp", h = 96 }
+tile_sign = { file = "tile_05.webp", h = 96 }
+tile_fork = { file = "tile_06.webp", h = 96 }
+tile_leaf = { file = "tile_07.webp", h = 96 }
+tile_shop = { file = "tile_08.webp", h = 96 }
+tile_pixel = { file = "tile_09.webp", h = 96 }
+tile_cross = { file = "tile_10.webp", h = 96 }
+tile_question = { file = "tile_11.webp", h = 96 }
+
+[palette]
+sea_deep = "#2F7FAE"
+sea_light = "#8ED6E2"
+foam = "#F2FBF8"
+sand = "#EFDDB0"
+grass = "#8EC47A"
+grass_dark = "#6E9F5E"
+cliff = "#B0A08A"
+cliff_dark = "#6F604F"
+lake = "#3E9CC8"
+lake_light = "#A8DEEA"
+path = "#E9D7AE"
+
+# ---------- 地形 ----------
+
+[[terrain]]
+kind = "island"
+cliff = 46
+rim = 26
+points = [
+  [330, 2350], [260, 2000], [300, 1600], [380, 1250], [470, 950], [560, 650], [760, 400], [1050, 300],
+  [1400, 330], [1700, 420], [2000, 380], [2400, 360], [2800, 330], [3150, 330], [3380, 480], [3460, 800],
+  [3440, 1150], [3350, 1500], [3250, 1800], [3150, 2100], [2900, 2350], [2500, 2450], [2000, 2450],
+  [1500, 2470], [1000, 2460], [600, 2440],
+]
+
+[[terrain]]
+kind = "sand"
+points = [[300, 2390], [262, 2080], [360, 1960], [560, 2020], [780, 2230], [740, 2450], [450, 2460]]
+
+[[terrain]]
+kind = "sand"
+points = [[2150, 2440], [2480, 2330], [2850, 2220], [3080, 2160], [2920, 2380], [2550, 2460]]
+
+[[terrain]]
+kind = "patch"
+color = "#5E9A55"
+alpha = 0.32
+points = [[470, 760], [620, 470], [900, 360], [1250, 340], [1560, 440], [1660, 660], [1450, 640],
+          [1150, 620], [960, 800], [820, 1000], [560, 1000]]
+
+[[terrain]]
+kind = "patch"
+texture = "path"
+alpha = 0.9
+points = [[2060, 730], [2300, 720], [2560, 750], [2600, 900], [2360, 990], [2110, 930]]
+
+[[terrain]]
+kind = "plateau"
+color = "#C3B4E6"
+cliff = 22
+block = 16
+points = [[1150, 1120], [1300, 1085], [1480, 1045], [1610, 1090], [1650, 1260], [1520, 1390],
+          [1300, 1410], [1160, 1300]]
+
+[[terrain]]
+kind = "lake"
+center = [820, 1700]
+radius = [200, 150]
+
+[[terrain]]
+kind = "river"
+width = 44
+points = [[1100, 760], [1060, 940], [1012, 1076], [975, 1300], [900, 1570]]
+
+# ---------- 建筑与装饰 ----------
+# at 是脚底的世界坐标。高的物件放在道路北边（y 更小），否则会挡住路上的格子。
+# layer = "ground" 的贴图画进地面层（桥），角色从上面走过。
+
+# 海边小屋（起点）
+[[decor]]
+sprite = "house_start"
+at = [430, 2340]
+scale = 0.8
+
+[[decor]]
+sprite = "palm"
+at = [330, 2010]
+scale = 0.9
+
+[[decor]]
+sprite = "palm"
+at = [380, 1400]
+scale = 0.95
+
+[[decor]]
+sprite = "rocks"
+at = [700, 2420]
+
+# 湖畔
+[[decor]]
+sprite = "dock"
+at = [596, 1772]
+
+[[decor]]
+sprite = "boat"
+at = [880, 1765]
+
+[[decor]]
+sprite = "tree_round"
+at = [1100, 1700]
+
+[[decor]]
+sprite = "bush"
+at = [700, 1500]
+
+# 蘑菇森林
+[[decor]]
+sprite = "forest_station"
+at = [730, 550]
+scale = 0.9
+
+[[decor]]
+sprite = "mushroom_tree"
+at = [960, 420]
+
+[[decor]]
+sprite = "tree_round"
+at = [1130, 400]
+
+[[decor]]
+sprite = "mushroom_tree"
+at = [1290, 415]
+scale = 1.1
+
+[[decor]]
+sprite = "tree_round"
+at = [1460, 450]
+
+[[decor]]
+sprite = "mushroom_tree"
+at = [1200, 800]
+
+[[decor]]
+sprite = "tree_round"
+at = [1380, 850]
+scale = 0.9
+
+[[decor]]
+sprite = "bush"
+at = [1270, 900]
+
+[[decor]]
+sprite = "rocks"
+at = [1150, 690]
+scale = 0.8
+
+# 像素小桥与遗迹
+[[decor]]
+sprite = "bridge"
+at = [1010, 1104]
+scale = 0.85
+layer = "ground"
+
+[[decor]]
+sprite = "pixel_ruins"
+at = [1420, 1390]
+scale = 0.93
+
+[[decor]]
+sprite = "pixel_tree"
+at = [1230, 1330]
+scale = 0.9
+
+[[decor]]
+sprite = "pixel_tree"
+at = [1590, 1250]
+scale = 0.9
+
+# 小镇
+[[decor]]
+sprite = "candy_stall"
+at = [1830, 640]
+
+[[decor]]
+sprite = "shop"
+at = [2109, 560]
+
+[[decor]]
+sprite = "bench"
+at = [2262, 570]
+
+[[decor]]
+sprite = "tree_round"
+at = [2450, 520]
+
+[[decor]]
+sprite = "fountain"
+at = [2330, 930]
+
+[[decor]]
+sprite = "bush"
+at = [2560, 520]
+
+[[decor]]
+sprite = "tree_round"
+at = [2750, 480]
+
+[[decor]]
+sprite = "lighthouse"
+at = [3250, 470]
+
+[[decor]]
+sprite = "rocks"
+at = [3370, 580]
+
+[[decor]]
+sprite = "hospital"
+at = [2930, 1010]
+scale = 0.93
+
+[[decor]]
+sprite = "palm"
+at = [3360, 1150]
+scale = 0.95
+
+[[decor]]
+sprite = "signpost"
+at = [2840, 1330]
+scale = 0.93
+
+# 花园与中间草地（中间留一块空地给以后的地标）
+[[decor]]
+sprite = "tree_round"
+at = [2550, 1250]
+
+[[decor]]
+sprite = "bush"
+at = [2350, 1380]
+
+[[decor]]
+sprite = "bush"
+at = [2420, 1700]
+
+[[decor]]
+sprite = "tree_round"
+at = [1800, 1150]
+scale = 0.9
+
+[[decor]]
+sprite = "tree_round"
+at = [2100, 1150]
+
+[[decor]]
+sprite = "tree_round"
+at = [1350, 1700]
+scale = 0.9
+
+[[decor]]
+sprite = "mushroom_tree"
+at = [1600, 1550]
+scale = 0.8
+
+# 回家路
+[[decor]]
+sprite = "tree_round"
+at = [1300, 2050]
+scale = 0.9
+
+[[decor]]
+sprite = "tree_round"
+at = [1700, 2050]
+
+[[decor]]
+sprite = "bush"
+at = [1000, 2030]
+
+[[decor]]
+sprite = "rocks"
+at = [1250, 2420]
+
+[[decor]]
+sprite = "bush"
+at = [1650, 2420]
+
+# 海
+[[decor]]
+sprite = "whale"
+at = [3380, 2420]
+
+[[decor]]
+sprite = "boat"
+at = [1500, 2565]
+
+[[decor]]
+sprite = "rocks"
+at = [140, 1200]

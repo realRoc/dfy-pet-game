@@ -1,0 +1,27 @@
+house_start	sprite	a single cozy beach cottage with a blue tiled roof, cream plaster walls, round window, wooden door, small red mailbox and a few hydrangea bushes at its base
+dock	sprite	a small wooden fishing pier jutting forward, weathered planks on posts, a hanging lantern on a pole, a fishing rod leaning on a crate, a coiled rope and a tiny bucket. Only the pier itself, no water surface around it
+forest_station	sprite	a whimsical forest ranger hut built under a giant teal-blue spotted mushroom cap, round wooden door, small window with warm light, a basket of mushrooms and a little wooden sign post (blank, no text) by the door, a few ferns at the base
+pixel_ruins	sprite	a small ancient stone shrine ruin made of lavender and purple voxel cubes, a crumbling pixel-art archway with a glowing purple pixel-invader emblem (blocky, no text), floating purple cubes, blocky lavender bushes at its base
+shop	sprite	a cozy seaside general store, wooden walls, blue and white striped awning, wooden counter with fish-shaped snacks and jars, a carved wooden fish sign on the roof (no text), crates and a barrel by the door
+hospital	sprite	a small cute clinic, cream walls, mint green tiled roof, a white rounded first-aid box with a mint green cross mounted above the door, arched glass door, flower boxes and a white picket fence segment
+candy_stall	sprite	a small candy stall cart with a pink and white striped awning, jars of colorful candies and lollipops, wrapped sweets on the counter, small wooden wheels
+lighthouse	sprite	a short chubby lighthouse with white and navy blue stripes, glass lantern room glowing warm yellow, on a small cluster of grey sea rocks with a tiny wooden door
+fountain	sprite	a round stone town-square fountain with a small whale statue spouting water in the middle, clear blue water, flower planters around the rim
+boat	sprite	a small wooden rowing boat with two oars and a coiled rope, floating, seen from above at the 3/4 angle, no water around it
+whale	sprite	a giant friendly blue-grey whale surfacing, its broad mossy back covered in little grass patches and tiny flowers like a living island, small water spout from the blowhole, calm smile, shown partially above water with a soft splash ring at the waterline
+bridge	sprite	a short wooden plank footbridge with rope railings, spanning left to right, slightly arched
+tree_round	sprite	a single lush round broadleaf tree with a sturdy trunk, layered soft green canopy with light highlights
+palm	sprite	a single slender coconut palm tree with a gently curved trunk and full fronds, a couple of coconuts
+mushroom_tree	sprite	a single giant teal-blue mushroom with white spots and a pale thick stem, with two small mushrooms at its base
+pixel_tree	sprite	a single blocky voxel tree, lavender and purple cube leaves, brown cube trunk, crisp pixel-art style cubes but with the same soft lighting
+bush	sprite	a single round hydrangea bush with blue and pink flower clusters and green leaves
+rocks	sprite	a small cluster of three rounded grey boulders with a little moss
+bench	sprite	a single small wooden park bench with curly iron legs
+signpost	sprite	a single wooden signpost with two blank arrow boards pointing left and right (no text), a few flowers at the base
+chest	sprite	a single closed wooden treasure chest with gold trim and a whale-tail emblem, slightly open with a warm glow
+tiles	sheet	a sprite sheet of 12 game board stepping-stone tiles arranged in a clean 4 columns by 3 rows grid with generous empty space between them. Every tile is the same size and the same shape: a thick rounded-square cream stone slab with soft beveled edges seen from the 3/4 top-down angle, with a simple engraved emblem on top and a tinted top surface. Row 1: gold flag on yellow stone; small fish on cream stone; fishing hook on blue stone; treasure chest on orange stone. Row 2: park bench on lavender stone; signpost on beige stone; forked arrows on beige stone; leaf on green stone. Row 3: shopping bag on peach stone; pixel space-invader on purple stone; white cross on mint stone; question mark on teal stone
+tex_grass	texture	lush stylized grass meadow with tiny clover, small white and yellow wildflower specks and subtle color variation
+tex_sand	texture	warm pale beach sand with fine grain, a few tiny shells and pebbles
+tex_water	texture	clear shallow turquoise sea water surface with soft caustic light ripples
+tex_cliff	texture	stacked rounded grey-beige stone blocks of a cliff wall, slightly mossy
+tex_path	texture	packed light tan dirt footpath with small embedded pebbles

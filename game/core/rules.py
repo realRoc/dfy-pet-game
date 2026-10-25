@@ -1,9 +1,10 @@
 """回合规则：掷骰、逐边移动、起点工资、落地事件。
 
 UI 只调用这里的方法并播放返回的结果，不在绘制里随机或加钱。
+落地事件的结果（小鱼干、位置、暂停）在 land() 里一次写进状态，UI 之后只播动画。
 """
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .dice import D6
 
@@ -22,7 +23,9 @@ class Landing:
     kind: str
     coins: int = 0
     say: str = ""
-    expression: bool = False   # 让 UI 随机播一个表情
+    expression: str = ""   # 表情 key，"random" 表示随机，空为不做
+    path: list = field(default_factory=list)   # 强制移动经过的节点（不含出发点），最后一个是新位置
+    warp_to: str = ""      # 传送到的节点
 
 
 class Rules:
@@ -40,25 +43,52 @@ class Rules:
             return None
         return self.dice.roll(self.rng)
 
-    def hop(self, state):
-        """沿默认出口走一条边，并结算这条边的起点工资。"""
+    def hop(self, state, dst=None):
+        """沿一条边走一步，并结算这条边的起点工资。岔路上必须指定 dst。"""
         src = state.node_id
-        dst = self.graph.next_of(src)
+        exits = self.graph.exits(src)
+        if dst is None:
+            if len(exits) > 1:
+                raise ValueError(f"{src} 是岔路，需要选择出口 {exits}")
+            dst = exits[0]
+        elif dst not in exits:
+            raise ValueError(f"{src} 不能直接走到 {dst}")
         wage = START_WAGE if self.graph.is_start_edge(src, dst) else 0
         state.node_id = dst
         state.coins += wage
         return Hop(src, dst, wage)
+
+    def forced_path(self, node_id, steps):
+        """强制移动的路线：前进走默认出口，后退走第一个来路。"""
+        path, cur = [], node_id
+        for _ in range(abs(steps)):
+            cur = self.graph.next_of(cur) if steps > 0 else self.graph.prev_of(cur)
+            if cur is None:
+                break
+            path.append(cur)
+        return path
 
     def land(self, state):
         """回合终点的事件。起点工资已经在 hop 里发过，这里不再给。"""
         kind = self.graph.node(state.node_id).type
         tile = self.tiles[kind]
         if tile.random_expression:
-            return Landing(kind, expression=True)
+            return Landing(kind, expression="random")
         if not tile.events:
             return Landing(kind)
-        ev = self.rng.choice(tile.events)
-        state.coins += ev.coins
+        ev = self.rng.choices(tile.events, weights=[e.weight for e in tile.events])[0]
+        before = state.coins
+        state.coins = max(0, state.coins + ev.coins)
         if ev.skip_next:
             state.skip_next = True
-        return Landing(kind, coins=ev.coins, say=ev.say)
+        landing = Landing(kind, coins=state.coins - before, say=ev.say, expression=ev.expression)
+        if ev.move:
+            landing.path = self.forced_path(state.node_id, ev.move)
+            if landing.path:
+                state.node_id = landing.path[-1]
+        elif ev.warp:
+            target = self.graph.first_of_type(ev.warp)
+            if target and target != state.node_id:
+                landing.warp_to = target
+                state.node_id = target
+        return landing

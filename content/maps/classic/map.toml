@@ -4,10 +4,14 @@
 # 节点顺序也是旧存档 board_pos 的下标顺序，不要随意调换。
 
 name = "经典外圈"
+subtitle = "经典外圈"
 start = "m00"
 grid = [8, 6]
-canvas = [624, 468]   # 8×78, 6×78
+canvas = [760, 740]
+grid_area = [68, 120, 624, 468]   # 8×78, 6×78；上面留给角色和顶栏，下面留给骰子托盘
 tile = 78
+dice = "classic"
+tile_style = "card"
 loop = true
 
 node = [

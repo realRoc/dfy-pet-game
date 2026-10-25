@@ -1,0 +1,59 @@
+cottage	sprite	a small cozy villager house with a rounded thatched roof, cream walls, a round wooden door with a wreath, a little chimney and a small lantern
+cottage_red	sprite	a small cozy villager house with a red tiled roof, warm red-brick walls, a green wooden door, two round windows with flower boxes
+cottage_blue	sprite	a small cozy villager house with a slate blue roof, half-timbered cream walls, an arched wooden door and a small porch lamp
+town_hall	sprite	a medieval town hall with a purple slate roof and a small clock tower with a round clock, red-brick walls, cream stone columns at the entrance, two lanterns
+city_gate	sprite	a medieval red-brick city gatehouse with two round towers with grey cone roofs, a wooden arched gate and two red banners
+wall_segment	sprite	a straight section of red-brick medieval city wall with simple crenellations and a little ivy, spanning left to right, about three times wider than tall
+wall_tower	sprite	a single round red-brick watchtower with simple crenellations and a grey cone roof with a tiny flag
+tavern	sprite	a cozy medieval tavern with a dark timber frame and cream plaster, a hanging wooden mug sign without text, barrels by the door, warm glowing windows
+market_stall	sprite	a market stall with a red and cream striped awning and crates of bread, apples and cheese
+fountain	sprite	a round stone plaza fountain with a two tier basin and a soft water spray
+flower_arch	sprite	a garden arch made of two wooden posts wrapped in green vines with a round wreath of small colorful flowers on top
+ruin_wall	sprite	a crumbling old red-brick ruin wall with a broken arched doorway, missing bricks and soft moss
+ruin_column	sprite	a cluster of broken old stone columns of different heights with moss
+stone_statue	sprite	a mossy old stone statue of a knight with a sword on a square pedestal
+gyroid_a	sprite	a small round clay figurine with a hollow-eyed simple face and stubby arms raised, warm orange terracotta, original design
+gyroid_b	sprite	a small bell-shaped clay figurine with a tiny round head and hollow eyes, warm terracotta with a faint stripe pattern, original design
+gyroid_c	sprite	a small wide squat clay figurine with a round face, hollow eyes and an open singing mouth, terracotta with blue paint marks, original design
+witch_house	sprite	a crooked witch cottage at night with a scalloped dark blue shingle roof, a crooked stone chimney, a round wooden door with a dark wreath, candles glowing by the door, cool blue moonlight
+cauldron	sprite	a black iron cauldron bubbling with glowing green potion over a small fire ringed with stones, at night
+glow_pond	sprite	a small round pond ringed with grey stones and glowing turquoise water with tiny sparkles, at night
+corpse_flower	sprite	a giant dark purple flower with a tall cream spike in the middle and big leaves, at night
+beanstalk	sprite	a cluster of giant twisting dark green beanstalk vines rising from the ground, at night
+night_bush	sprite	a round dark blue-green bush with small yellow glowing flowers, at night
+cedar	sprite	a single cedar tree with layered drooping dark blue-green branches like soft felt, short brown trunk with wide roots
+hardwood	sprite	a single round leafy tree with a short brown trunk and a puffy green crown made of big soft leaf clumps
+palm	sprite	a single coconut palm tree with a curved segmented trunk and big soft fronds
+bush	sprite	a single round green holly bush made of soft leaf clumps
+flowers	sprite	a small clump of white cosmos flowers with green stems
+rose_bush	sprite	a single round bush with soft red roses
+rocks	sprite	a small cluster of two rounded grey rocks
+harbor_pier	sprite	a wooden pier on posts with a small sailing ship moored beside it, one cream sail with a simple whale emblem, crates and a coiled rope on the pier, the ship floating on a small patch of teal water
+lighthouse	sprite	a short stone lighthouse with a glowing lantern room on top, standing on a few rounded sea rocks
+crates	sprite	a stack of wooden crates and barrels with a fishing net and a small anchor
+windpump	sprite	an old farm windpump on a tall wooden lattice tower with a round fan of orange metal blades
+round_hut	sprite	a round farm hut with an orange thatched cone roof, a pink-red wooden door with a wreath and a little chimney pipe
+scarecrow	sprite	a friendly scarecrow in a straw hat on a wooden post with two hay bales and pumpkins
+wheat	sprite	a dense clump of tall golden ripe wheat stalks, upright
+stone_silo	sprite	a tall round white stone farm silo with a dome roof and a slim white wind turbine with purple tips beside it
+hyacinth	sprite	a neat row of blue-purple hyacinth flowers, upright, spanning left to right
+easel	sprite	a wooden painter's easel with a blank canvas and a small round stool
+fence	sprite	a short rustic wooden fence segment with posts and barbed wire, spanning left to right
+gazebo	sprite	a round white stone gazebo with six columns and a dark grey domed roof, climbing roses
+willow	sprite	a single weeping willow tree with long drooping light green branches like soft felt
+swirl_garden	sprite	a round hedge garden of trimmed green hedges forming a spiral, seen from above at an angle, a small stone birdbath in the center
+lamp_post	sprite	a black iron street lamp post with a warm glowing lantern
+signpost	sprite	a wooden signpost with two blank arrow boards pointing left and right, no text
+bench	sprite	a small wooden bench with iron armrests
+boat	sprite	a small wooden rowing boat with two oars, no water around it
+rainbow_beach	sprite	a beach spot with three rainbow-striped beach umbrellas, striped towels and a sandcastle on a little patch of sand
+tiles	sheet	a sprite sheet of 16 board game stepping stones in a clean 4 columns by 4 rows grid with generous empty space between them. Every stone is the same size and the same shape: a flat rounded-square stone slab with soft rounded edges seen from a 45 degree camera, with a simple raised emblem on a softly tinted top. Row 1: red flag on cream stone; a completely plain cream stone with no emblem; treasure chest on orange stone; wooden bench on lavender stone. Row 2: rolled paper scroll on beige stone; forked arrows on beige stone; question mark on teal stone; small castle on brick red stone. Row 3: wheat sheaf on golden stone; hyacinth flower on purple stone; broken column on grey stone; small clay figurine on terracotta stone. Row 4: witch hat on dark indigo stone; anchor on navy blue stone; round gazebo on mint stone; fishing hook on light blue stone
+tex_grass	texture	the short soft grass ground of this game, plain green with many tiny lighter green triangle and clover marks scattered evenly
+tex_night_grass	texture	the short soft grass ground of this game at night, dark blue-green with tiny lighter triangle and clover marks scattered evenly
+tex_dirt	texture	a soft light tan dirt path ground with a few tiny pebbles and very subtle texture
+tex_path	texture	a stone path of rounded light grey and beige flat stones with soft grass-free gaps
+tex_brick	texture	warm salmon red cobblestone plaza pavement with rounded stones and soft grout
+tex_sand	texture	soft pale warm beach sand with very subtle ripples
+tex_water	texture	calm teal water with soft lighter wavy ripple lines
+tex_cliff	texture	a cliff face of layered warm brown soil and soft rounded stones, seen from the front
+tex_planks	texture	weathered warm brown wooden deck planks running horizontally

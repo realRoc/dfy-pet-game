@@ -132,3 +132,241 @@ class SaveCompatTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class IslandTest(unittest.TestCase):
+    """环岛大地图：道路自动排格子，两个岔路口。"""
+
+    def setUp(self):
+        self.tiles = load_tiles()
+        self.graph = load_map("island", tiles=self.tiles)
+        self.rules = Rules(self.graph, self.tiles, rng=random.Random(2))
+
+    def walk(self, start, first, stop):
+        """从 start 先走到 first，再沿默认出口走到 stop，返回步数。"""
+        n, cur = 1, first
+        while cur != stop:
+            cur = self.graph.next_of(cur)
+            n += 1
+        return n
+
+    def test_forks_and_branch_lengths(self):
+        forks = {n: self.graph.exits(n) for n in self.graph.nodes if self.graph.is_fork(n)}
+        self.assertEqual(forks, {"a08": ["b00", "p00"], "c16": ["d00", "g00"]})
+        self.assertEqual(self.walk("a08", "b00", "c00"), 10)   # 蘑菇森林
+        self.assertEqual(self.walk("a08", "p00", "c00"), 6)    # 像素小桥（捷径）
+        self.assertEqual(self.walk("c16", "d00", "e00"), 8)    # 海湾栈道
+        self.assertEqual(self.walk("c16", "g00", "e00"), 10)   # 花园小路
+        self.assertEqual(self.graph.next_of("e08"), "a00")
+
+    def test_nodes_spaced_along_roads(self):
+        import math
+        for a, n in self.graph.nodes.items():
+            for b in n.next:
+                d = math.dist(self.graph.anchor(a), self.graph.anchor(b))
+                self.assertTrue(110 < d < 220, f"{a}->{b} 间距 {d:.0f}")
+
+    def test_destinations_cover_both_branches(self):
+        self.assertEqual(self.graph.destinations("a07", 2), {"b00", "p00"})
+        self.assertEqual(self.graph.destinations("a00", 3), {"a03"})
+
+    def test_hop_at_fork_needs_choice(self):
+        st = BoardState(node_id="a08")
+        with self.assertRaises(ValueError):
+            self.rules.hop(st)
+        with self.assertRaises(ValueError):
+            self.rules.hop(st, "c00")
+        self.assertEqual(self.rules.hop(st, "p00").dst, "p00")
+        self.assertEqual(st.node_id, "p00")
+
+    def test_wage_on_entering_start(self):
+        st = BoardState(node_id="e08")
+        self.assertEqual(self.rules.hop(st).wage, START_WAGE)
+
+    def test_unbuilt_features_give_no_fake_reward(self):
+        for kind in ("fishing", "forest", "shop", "pixel", "hospital", "story", "fork"):
+            self.assertTrue(all(ev.coins == 0 for ev in self.tiles[kind].events), kind)
+
+    def test_supply_pays_one(self):
+        st = BoardState(node_id="a01")
+        self.rules.land(st)
+        self.assertEqual(st.coins, 1)
+
+    def test_every_tile_type_has_sprite(self):
+        used = {n.type for n in self.graph.nodes.values()}
+        self.assertEqual(used - set(self.graph.art["tile_sprites"]), set())
+
+    def test_road_end_must_meet_node(self):
+        root = tempfile.mkdtemp()
+        try:
+            shutil.copytree(CONTENT_DIR, root, dirs_exist_ok=True)
+            path = os.path.join(root, "maps", "island", "map.toml")
+            with open(path, encoding="utf-8") as f:
+                text = f.read()
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text.replace("points = [[760, 1080], [960, 1080]", "points = [[900, 1300], [960, 1080]"))
+            with self.assertRaises(ContentError):
+                load_map("island", root)
+        finally:
+            shutil.rmtree(root)
+
+
+class ArtCoverageTest(unittest.TestCase):
+    """配置允许的每种美术都要有画法，否则加载通过、绘制时才报错。"""
+
+    def test_painters_cover_kinds(self):
+        from game.content.art_kinds import DECOR_KINDS, SYMBOLS, TERRAIN_KINDS
+        from game.render.decor import DECOR_PAINTERS
+        from game.render.map_renderer import MapRenderer
+        from game.render.symbols import SYMBOL_PAINTERS
+        self.assertEqual(set(DECOR_PAINTERS), DECOR_KINDS)
+        self.assertEqual(set(SYMBOL_PAINTERS), SYMBOLS)
+        for kind in TERRAIN_KINDS:
+            self.assertTrue(hasattr(MapRenderer, "paint_" + kind), kind)
+
+    def test_island_sprites_exist_and_loaded(self):
+        g = load_map("island")
+        self.assertTrue(all(os.path.isfile(s["path"]) for s in g.art["sprites"].values()))
+        self.assertTrue(all(os.path.isfile(t) for t in g.art["textures"].values()))
+
+    def test_bad_decor_and_symbol_rejected(self):
+        root = tempfile.mkdtemp()
+        try:
+            shutil.copytree(CONTENT_DIR, root, dirs_exist_ok=True)
+            path = os.path.join(root, "maps", "island", "map.toml")
+            with open(path, "a", encoding="utf-8") as f:
+                f.write('\n[[decor]]\nkind = "spaceship"\nat = [1, 1]\n')
+            with self.assertRaises(ContentError):
+                load_map("island", root)
+            with open(os.path.join(root, "tiles.toml"), "a", encoding="utf-8") as f:
+                f.write('\n[types.oops]\nname = "x"\ncolor = "#FFFFFF"\nsymbol = "rocket"\n')
+            with self.assertRaises(ContentError):
+                load_tiles(root)
+        finally:
+            shutil.rmtree(root)
+
+
+class CubeDiceTest(unittest.TestCase):
+    def test_final_face_is_result(self):
+        from game.render.cube import front_face, orientation
+        for a in range(1, 7):
+            for b in range(1, 7):
+                for axis in ((1, 0, 0), (0.3, -0.5, 0.4)):
+                    for turns in (1, 2):
+                        self.assertEqual(front_face(orientation(a, b, 0.0, axis, turns)), a)
+                        self.assertEqual(front_face(orientation(a, b, 1.0, axis, turns)), b)
+
+    def test_cream_timing(self):
+        s = load_dice_skin("cream")
+        self.assertEqual(s.style, "cube")
+        self.assertAlmostEqual(s.rolling_time, 0.73)
+        self.assertAlmostEqual(s.reveal_time, 0.18)
+
+
+class MedievalTest(unittest.TestCase):
+    """中世纪小岛：三个岔路口、湖心岛、地点事件。"""
+
+    def setUp(self):
+        self.tiles = load_tiles()
+        self.graph = load_map("medieval", tiles=self.tiles)
+
+    def rules_with(self, kind, event, seed=0):
+        """把某种格子的事件换成只有一条，方便测确定结果。"""
+        from dataclasses import replace
+        tiles = dict(self.tiles)
+        tiles[kind] = replace(tiles[kind], events=[event])
+        return Rules(self.graph, tiles, rng=random.Random(seed))
+
+    def walk(self, first, stop):
+        n, cur = 1, first
+        while cur != stop:
+            cur = self.graph.next_of(cur)
+            n += 1
+        return n
+
+    def test_forks(self):
+        forks = {n: self.graph.exits(n) for n in self.graph.nodes if self.graph.is_fork(n)}
+        self.assertEqual(forks, {"c12": ["n00", "g00"], "n04": ["q00", "v00"], "k01": ["i00", "t00"]})
+        self.assertEqual(self.walk("g00", "k00"), 6)
+        self.assertEqual((self.walk("i00", "w00"), self.walk("t00", "w00")), (10, 5))
+
+    def test_west_road_from_top_left_through_community_to_city(self):
+        """左上角港口往南穿过社区和田野，在西南河口和南沙滩汇合回城。"""
+        self.assertEqual(self.walk("v00", "m00"), 18)
+        self.assertEqual(self.graph.next_of("s14"), "m00")
+        self.assertEqual(self.walk("m00", "c00"), 6)
+        xs = [self.graph.anchor(f"v{i:02d}")[0] for i in range(3, 13)]
+        self.assertTrue(all(x < 590 for x in xs))     # 一直在西边河道外侧的社区地带
+
+    def test_tiles_fit_their_place(self):
+        city = [n for n in self.graph.nodes if n.startswith("c")]
+        self.assertFalse(any(self.graph.node(n).type == "fishing" for n in city))
+        self.assertIn("blank", {n.type for n in self.graph.nodes.values()})
+
+    def test_every_special_place_on_the_board(self):
+        types = {n.type for n in self.graph.nodes.values()}
+        for kind in ("city", "harbor", "lavender", "ruins", "lake_isle", "gyroid", "witch", "field"):
+            self.assertIn(kind, types)
+
+    def test_lake_isle_reachable_by_road(self):
+        self.assertIn("i01", self.graph.destinations("k01", 2))
+        self.assertEqual(self.graph.node("i01").type, "lake_isle")
+
+    def test_no_overlapping_tiles(self):
+        import itertools
+        import math
+        for a, b in itertools.combinations(self.graph.nodes, 2):
+            self.assertGreater(math.dist(self.graph.anchor(a), self.graph.anchor(b)), self.graph.tile, (a, b))
+
+    def test_forced_move_forward_skips_wage_and_event(self):
+        from game.core.tiles import TileEvent
+        st = BoardState(node_id="w01", coins=5)
+        landing = self.rules_with("witch", TileEvent(move=3, say="飞")).land(st)
+        self.assertEqual(landing.path, ["w02", "w03", "w04"])
+        self.assertEqual((st.node_id, st.coins), ("w04", 5))
+
+    def test_forced_move_back_follows_first_road_in(self):
+        from game.core.tiles import TileEvent
+        st = BoardState(node_id="q06")
+        landing = self.rules_with("ruins", TileEvent(move=-2)).land(st)
+        self.assertEqual(landing.path, ["q05", "q04"])
+        self.assertEqual(st.node_id, "q04")
+        # 合流点往回退走第一条写进来的路
+        self.assertEqual(self.graph.prev_of("k00"), "g04")
+
+    def test_harbor_warp_to_lake_isle_without_wage(self):
+        from game.core.tiles import TileEvent
+        st = BoardState(node_id="q00", coins=1)
+        landing = self.rules_with("harbor", TileEvent(warp="lake_isle")).land(st)
+        self.assertEqual((landing.warp_to, st.node_id, st.coins), ("i01", "i01", 1))
+
+    def test_coins_never_negative(self):
+        from game.core.tiles import TileEvent
+        st = BoardState(node_id="w01", coins=1)
+        landing = self.rules_with("witch", TileEvent(coins=-2)).land(st)
+        self.assertEqual((st.coins, landing.coins), (0, -1))
+
+    def test_skip_and_expression(self):
+        from game.core.tiles import TileEvent
+        st = BoardState(node_id="n01")
+        landing = self.rules_with("lavender", TileEvent(skip_next=True, expression="sleepy")).land(st)
+        self.assertTrue(st.skip_next)
+        self.assertEqual(landing.expression, "sleepy")
+
+    def test_event_expressions_exist(self):
+        from expressions import EXPRESSIONS
+        for t in self.tiles.values():
+            for ev in t.events:
+                self.assertTrue(ev.expression in ("", "random") or ev.expression in EXPRESSIONS,
+                                f"{t.id}: {ev.expression}")
+
+    def test_bad_event_field_rejected(self):
+        root = tempfile.mkdtemp()
+        try:
+            shutil.copytree(CONTENT_DIR, root, dirs_exist_ok=True)
+            with open(os.path.join(root, "tiles.toml"), "a", encoding="utf-8") as f:
+                f.write('\n[types.oops]\nname = "x"\ncolor = "#FFFFFF"\nevents = [{ teleport = "a" }]\n')
+            with self.assertRaises(ContentError):
+                load_tiles(root)
+        finally:
+            shutil.rmtree(root)
