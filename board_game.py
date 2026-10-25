@@ -335,8 +335,8 @@ class BoardWindow(QWidget):
         self.update()
 
     def animating(self):
-        """掷骰 / 移动 / 选路 / 事件、镜头没停稳、气泡 / 表情 / 光圈还在播，就要满帧整窗重画。"""
-        if self.state != "idle" or self.expr.active:
+        """掷骰 / 移动 / 选路 / 事件、镜头没停稳、气泡 / 表情 / 动作动画 / 光圈还在播，就要满帧整窗重画。"""
+        if self.state != "idle" or self.expr.active or self.clip.active:
             return True
         if max(self.fade_t, self.land_t, self.glow_t) > 0 or (self.bubble_left > 0 and self.bubble_text):
             return True
