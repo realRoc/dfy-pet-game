@@ -21,6 +21,7 @@ IS_WIN = sys.platform == "win32"
 UI_FONT = "PingFang SC" if IS_MAC else "Microsoft YaHei UI"
 EMOJI_FONT = "Apple Color Emoji" if IS_MAC else "Segoe UI Emoji"
 
+APP_NAME = "大肥鱼"
 SPRITE_SRC_H = 340  # sprites/ 里原图的高度
 
 DEFAULT_CFG = {
@@ -67,6 +68,48 @@ def float_flags(topmost=True):
     if topmost:
         flags |= Qt.WindowType.WindowStaysOnTopHint
     return flags
+
+
+def relaunch_in_mac_app():
+    """macOS 上程序坞和 ⌘Tab 显示的是可执行文件所在 .app 的名字，直接跑解释器就是 Python。
+    把解释器复制进 build/大肥鱼.app，再从那里重新启动自己；
+    __PYVENV_LAUNCHER__ 和系统自带的 python 启动器用法一样，让它照旧用当前的虚拟环境。"""
+    if not IS_MAC or getattr(sys, "frozen", False) or os.environ.get("DFY_IN_APP"):
+        return
+    src = os.path.join(sys.base_prefix, "Resources", "Python.app", "Contents", "MacOS", "Python")
+    if not os.path.isfile(src):  # 不是 framework 版的 Python，没有可借用的解释器
+        return
+    try:
+        import filecmp
+        import plistlib
+        import shutil
+        contents = os.path.join(APP_DIR, "build", f"{APP_NAME}.app", "Contents")
+        exe = os.path.join(contents, "MacOS", APP_NAME)
+        if not (os.path.isfile(exe) and filecmp.cmp(src, exe, shallow=False)):
+            os.makedirs(os.path.dirname(exe), exist_ok=True)
+            shutil.copy2(src, exe)
+        # Info.plist 单独检查：上次可能复制完解释器就被打断，没写上或写坏了
+        plist = os.path.join(contents, "Info.plist")
+        info = {
+            "CFBundleName": APP_NAME,
+            "CFBundleDisplayName": APP_NAME,
+            "CFBundleExecutable": APP_NAME,
+            "CFBundleIdentifier": "io.github.dfy-pet-game",
+            "CFBundlePackageType": "APPL",
+            "NSHighResolutionCapable": True,
+        }
+        try:
+            with open(plist, "rb") as f:
+                plist_ok = plistlib.load(f) == info
+        except Exception:
+            plist_ok = False
+        if not plist_ok:
+            with open(plist, "wb") as f:
+                plistlib.dump(info, f)
+        env = dict(os.environ, DFY_IN_APP="1", __PYVENV_LAUNCHER__=sys.executable)
+        os.execve(exe, [exe, os.path.abspath(sys.argv[0])] + sys.argv[1:], env)
+    except Exception as e:
+        print("以独立程序名启动失败，继续用 Python 运行:", e)
 
 
 def load_config():
