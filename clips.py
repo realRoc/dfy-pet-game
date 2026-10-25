@@ -61,7 +61,7 @@ class ClipPlayer:
         return self.name is not None
 
     def start(self, name=None):
-        """开始播一段（不传则随机），返回名字；打不开返回 None。"""
+        """开始播一段（不传则随机），返回名字；打不开或第一帧就解不出来返回 None。"""
         if not AVAILABLE:
             return None
         self.stop()
@@ -81,11 +81,17 @@ class ClipPlayer:
         self._decoded = -1
         self.image = None
         self._advance()
+        if self.image is None:   # 解码出错（_advance 里已经停掉）或者一帧都没有
+            self.stop()
+            return None
         return name
 
     def stop(self):
         if self._container is not None:
-            self._container.close()
+            try:
+                self._container.close()
+            except Exception as e:
+                print("动作动画关闭失败:", e)
         self.name, self.image, self._container, self._frames = None, None, None, None
 
     def update(self, dt):
@@ -97,20 +103,25 @@ class ClipPlayer:
                 self._advance()
 
     def _advance(self):
-        """解到当前时间对应的帧；落后多帧时中间的只解码不转图。"""
-        target = int(self.t * CLIPS[self.name]["fps"])
-        frame = None
-        while self._decoded < target:
-            frame = next(self._frames, None)
-            if frame is None:
-                self.dur = self.t   # 实际帧数比记录的少：播完当前帧就结束
-                return
-            self._decoded += 1
-        if frame is not None:
-            rgba = frame.reformat(format="rgba")
-            plane = rgba.planes[0]
-            img = QImage(bytes(plane), rgba.width, rgba.height, plane.line_size, QImage.Format.Format_RGBA8888)
-            self.image = img.copy(self._crop)
+        """解到当前时间对应的帧；落后多帧时中间的只解码不转图。
+        素材损坏、下载不完整之类解码出错时停掉这段，回到三视图，不往界面回调里抛异常。"""
+        try:
+            target = int(self.t * CLIPS[self.name]["fps"])
+            frame = None
+            while self._decoded < target:
+                frame = next(self._frames, None)
+                if frame is None:
+                    self.dur = self.t   # 实际帧数比记录的少：播完当前帧就结束
+                    return
+                self._decoded += 1
+            if frame is not None:
+                rgba = frame.reformat(format="rgba")
+                plane = rgba.planes[0]
+                img = QImage(bytes(plane), rgba.width, rgba.height, plane.line_size, QImage.Format.Format_RGBA8888)
+                self.image = img.copy(self._crop)
+        except Exception as e:
+            print(f"动作动画 {self.name} 解码失败:", e)
+            self.stop()
 
     def blend(self):
         """动画的不透明度：开头和结尾和三视图交叉淡化。"""

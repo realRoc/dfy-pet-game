@@ -1,0 +1,26 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.9", "3.12"]
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install -r requirements.txt
+      - run: python -m game.content check
+      # 含动作动画的真解码测试（tests/test_clips.py），没装上 PyAV 会跳过，这里先确认装上了
+      - run: python -c "import clips; assert clips.AVAILABLE"
+      - run: python -m unittest discover -s tests -v
