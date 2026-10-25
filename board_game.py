@@ -1,37 +1,27 @@
-"""大肥鱼飞行棋 · 原型
+"""飞行棋盘窗口
 
 透明置顶的小棋盘：点骰子（或按空格）掷出 1~6，大肥鱼逐格蹦过去，
-落地后按格子类型说句话、加减小鱼干。
+落地后按格子类型触发事件。问号格会让大肥鱼随机做一个表情。
+点右上角「收起」或按 Esc，棋盘收起，大肥鱼回到桌面继续当桌宠。
 
 精灵图与三视图朝向/呼吸/蹦跳的画法来自 dafeiyu-pet（MIT）：
 https://github.com/1190fasheqi/dafeiyu-pet
 """
 import math
-import os
 import random
-import sys
 
-from PySide6.QtCore import Qt, QTimer, QElapsedTimer, QPointF, QRectF
-from PySide6.QtGui import (QPainter, QPixmap, QFont, QColor, QIcon, QFontMetrics,
-                           QPolygonF, QPen, QPainterPath, QAction)
+from PySide6.QtCore import Qt, QTimer, QElapsedTimer, QPoint, QPointF, QRectF
+from PySide6.QtGui import QPainter, QColor, QFontMetrics, QPolygonF, QPen, QPainterPath
 from PySide6.QtWidgets import QApplication, QWidget, QMenu
 
-if getattr(sys, "frozen", False):
-    BUNDLE_DIR = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
-else:
-    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
-SPRITE_DIR = os.path.join(BUNDLE_DIR, "sprites")
-
-IS_MAC = sys.platform == "darwin"
-IS_WIN = sys.platform == "win32"
-UI_FONT = "PingFang SC" if IS_MAC else "Microsoft YaHei"
-EMOJI_FONT = "Apple Color Emoji" if IS_MAC else "Segoe UI Emoji"
+from common import ui_font, emoji_font, float_flags, load_sprites, pix_size
+from expressions import EXPRESSIONS, ExpressionPlayer
 
 # ===== 棋盘尺寸 =====
 COLS, ROWS = 8, 6          # 外圈 8x6，共 24 格
 TILE = 78
 PAD = 28
-PAD_TOP = 104              # 顶行上方给鱼和气泡留空间
+PAD_TOP = 104              # 顶行上方给鱼、气泡和收起按钮留空间
 WIN_W = PAD * 2 + COLS * TILE
 WIN_H = PAD_TOP + ROWS * TILE + PAD
 
@@ -47,23 +37,24 @@ FADE_TIME = 0.12
 
 # 类型: (图标, 名字, 底色)
 TILE_TYPES = {
-    "start":  ("🏁", "起点",   QColor(255, 214, 102)),
-    "fish":   ("🎣", "钓鱼",   QColor(140, 200, 255)),
-    "ring":   ("🎯", "套圈",   QColor(255, 170, 160)),
-    "candy":  ("🍬", "接糖果", QColor(255, 190, 225)),
-    "riddle": ("🧩", "猜谜",   QColor(180, 225, 160)),
-    "chest":  ("🎁", "宝箱",   QColor(255, 200, 120)),
-    "rest":   ("🛋️", "休息",   QColor(200, 190, 245)),
-    "prank":  ("😼", "恶作剧", QColor(190, 190, 205)),
+    "start":   ("🏁", "起点",   QColor(255, 214, 102)),
+    "mystery": ("❓", "问号",   QColor(120, 215, 205)),
+    "fish":    ("🎣", "钓鱼",   QColor(140, 200, 255)),
+    "ring":    ("🎯", "套圈",   QColor(255, 170, 160)),
+    "candy":   ("🍬", "接糖果", QColor(255, 190, 225)),
+    "riddle":  ("🧩", "猜谜",   QColor(180, 225, 160)),
+    "chest":   ("🎁", "宝箱",   QColor(255, 200, 120)),
+    "rest":    ("🛋️", "休息",   QColor(200, 190, 245)),
+    "prank":   ("😼", "恶作剧", QColor(190, 190, 205)),
 }
 LAYOUT = [
-    "start", "fish", "candy", "riddle", "rest", "ring", "chest", "fish",
-    "prank", "candy", "riddle", "rest", "ring",
-    "chest", "fish", "candy", "prank", "riddle", "rest", "ring",
-    "chest", "candy", "prank", "fish",
+    "start", "fish", "candy", "mystery", "rest", "ring", "chest", "fish",
+    "mystery", "candy", "riddle", "rest", "mystery",
+    "chest", "fish", "candy", "prank", "mystery", "rest", "ring",
+    "chest", "mystery", "prank", "fish",
 ]
 
-# 格子事件: (小鱼干变化, 台词)
+# 格子事件（小游戏还没做，先用台词 + 奖励占位）: (小鱼干变化, 台词)
 TILE_EVENTS = {
     "fish":   [(2, "钓到星星小鱼！+2 小鱼干"), (1, "钓到一只迷你鱼……也算吧 +1")],
     "ring":   [(1, "套中了！小勋章到手 +1"), (0, "差一点点……下次一定")],
@@ -94,28 +85,25 @@ def ease_out_back(u):
 
 
 class BoardWindow(QWidget):
-    def __init__(self):
-        flags = Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint
-        if IS_WIN:
-            # macOS 上 Tool 窗口会在应用失焦时自动隐藏，只在 Windows 用它来隐藏任务栏图标
-            flags |= Qt.WindowType.Tool
-        super().__init__(None, flags)
+    def __init__(self, app, cfg):
+        super().__init__(None, float_flags(cfg.get("topmost", True)))
+        self.app = app
+        self.cfg = cfg
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setFixedSize(WIN_W, WIN_H)
         self.setWindowTitle("大肥鱼飞行棋")
 
         self.cells = ring_cells(COLS, ROWS)
         assert len(self.cells) == len(LAYOUT)
-        self.ui_font = QFont(UI_FONT)
-        self.emoji_font = QFont(EMOJI_FONT)
-        self.load_sprites()
+        self.sprites = load_sprites(FISH_H)
 
         # 鱼的状态
-        self.pos_idx = 0
-        self.fish_xy = self.tile_anchor(0)
+        self.pos_idx = int(cfg.get("board_pos", 0)) % len(self.cells)
+        self.fish_xy = self.tile_anchor(self.pos_idx)
         self.dir, self.facing = "down", 1
         self.prev_key, self.fade_t = None, 0.0
         self.land_t = 0.0
+        self.expr = ExpressionPlayer()
 
         # 回合状态: idle / rolling / settle / moving
         self.state = "idle"
@@ -125,13 +113,11 @@ class BoardWindow(QWidget):
         self.steps_left = 0
         self.hop_from = self.hop_to = 0
         self.skip_next = False
-        self.coins = 0
-        self.turn = 0
+        self.coins = int(cfg.get("board_coins", 0))
+        self.turn = int(cfg.get("board_turn", 0))
         self.glow_idx, self.glow_t = None, 0.0
 
         self.bubble_text, self.bubble_left = "", 0.0
-        self.say("主人，点骰子带我去玩！", 3.5)
-
         self.drag_off = None
         self.clock = QElapsedTimer()
         self.clock.start()
@@ -140,17 +126,6 @@ class BoardWindow(QWidget):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.tick)
         self.timer.start(TICK_MS)
-
-    # ---------- 资源 ----------
-    def load_sprites(self):
-        dpr = (QApplication.primaryScreen().devicePixelRatio()
-               if QApplication.primaryScreen() else 1.0)
-        self.sprites = {}
-        for name in ("正面", "侧面", "背面"):
-            pix = QPixmap(os.path.join(SPRITE_DIR, f"{name}.png"))
-            pix = pix.scaledToHeight(int(FISH_H * dpr), Qt.TransformationMode.SmoothTransformation)
-            pix.setDevicePixelRatio(dpr)
-            self.sprites[name] = pix
 
     # ---------- 几何 ----------
     def tile_rect(self, idx):
@@ -170,6 +145,35 @@ class BoardWindow(QWidget):
         s = 84
         return QRectF(inner.center().x() - s / 2, inner.center().y() - s / 2 + 4, s, s)
 
+    def collapse_rect(self):
+        """放在中间空地的右上角，鱼走外圈时不会挡住它。"""
+        inner = self.inner_rect()
+        return QRectF(inner.right() - 84 - 12, inner.top() + 12, 84, 30)
+
+    # ---------- 和桌宠切换用 ----------
+    def foot_global(self):
+        a = self.tile_anchor(self.pos_idx)
+        return self.mapToGlobal(QPoint(int(a.x()), int(a.y())))
+
+    def place_fish_at(self, gp):
+        """把窗口摆到让鱼脚正好落在屏幕坐标 gp 上（再收回屏幕内）。"""
+        a = self.tile_anchor(self.pos_idx)
+        x, y = gp.x() - int(a.x()), gp.y() - int(a.y())
+        screen = QApplication.screenAt(gp) or QApplication.primaryScreen()
+        geo = screen.availableGeometry()
+        x = max(geo.left(), min(geo.right() - WIN_W, x))
+        y = max(geo.top() - PAD_TOP // 2, min(geo.bottom() - WIN_H, y))
+        self.move(x, y)
+
+    def save_state(self):
+        self.cfg.update(board_pos=self.pos_idx, board_coins=self.coins, board_turn=self.turn,
+                        board_x=self.x(), board_y=self.y())
+
+    def on_shown(self, greeting):
+        self.set_dir("down")
+        self.land_t = 1.0
+        self.say(greeting, 3.0)
+
     # ---------- 交互 ----------
     def say(self, text, secs=2.6):
         self.bubble_text, self.bubble_left = text, secs
@@ -177,6 +181,7 @@ class BoardWindow(QWidget):
     def roll(self):
         if self.state != "idle":
             return
+        self.expr.stop()
         self.turn += 1
         if self.skip_next:
             self.skip_next = False
@@ -193,6 +198,18 @@ class BoardWindow(QWidget):
         self.fish_xy = self.tile_anchor(0)
         self.set_dir("down")
         self.say("重新开始！")
+
+    def play_expression(self, key=None):
+        if self.state != "idle":
+            return
+        self.set_dir("down")
+        name, line = self.expr.start(key)
+        self.say(line, self.expr.dur + 0.6)
+        return name
+
+    def collapse(self):
+        if self.state == "idle":
+            self.app.collapse_board()
 
     def set_dir(self, d, facing=1):
         if (d, facing) != (self.dir, self.facing):
@@ -226,6 +243,10 @@ class BoardWindow(QWidget):
         self.glow_idx, self.glow_t = self.pos_idx, 1.0
         if kind == "start":
             return
+        if kind == "mystery":
+            name, line = self.expr.start()
+            self.say(f"【{name}】{line}", self.expr.dur + 0.8)
+            return
         delta, line = random.choice(TILE_EVENTS[kind])
         self.coins += delta
         if kind == "prank":
@@ -234,12 +255,13 @@ class BoardWindow(QWidget):
 
     def mousePressEvent(self, e):
         if e.button() == Qt.MouseButton.LeftButton:
-            if self.dice_rect().adjusted(-10, -10, 10, 10).contains(e.position()):
+            pos = e.position()
+            if self.collapse_rect().contains(pos):
+                self.collapse()
+            elif self.dice_rect().adjusted(-10, -10, 10, 10).contains(pos):
                 self.roll()
             else:
                 self.drag_off = e.globalPosition().toPoint() - self.pos()
-        elif e.button() == Qt.MouseButton.RightButton:
-            self.show_menu(e.globalPosition().toPoint())
 
     def mouseMoveEvent(self, e):
         if self.drag_off is not None:
@@ -252,27 +274,41 @@ class BoardWindow(QWidget):
         if e.key() in (Qt.Key.Key_Space, Qt.Key.Key_Return):
             self.roll()
         elif e.key() == Qt.Key.Key_Escape:
-            QApplication.quit()
+            self.collapse()
 
-    def show_menu(self, gpos):
+    def contextMenuEvent(self, e):
+        busy = self.state != "idle"
         m = QMenu(self)
-        for text, fn in (("掷骰子", self.roll), ("重新开始", self.restart), ("退出", QApplication.quit)):
-            act = QAction(text, m)
-            act.triggered.connect(fn)
-            m.addAction(act)
-        m.exec(gpos)
+        a = m.addAction("掷骰子", self.roll)
+        a.setEnabled(not busy)
+        expr_menu = m.addMenu("做个表情")
+        expr_menu.setEnabled(not busy)
+        expr_menu.addAction("随机", self.play_expression)
+        expr_menu.addSeparator()
+        for key, (name, _, _) in EXPRESSIONS.items():
+            expr_menu.addAction(name, lambda k=key: self.play_expression(k))
+        a = m.addAction("重新开始", self.restart)
+        a.setEnabled(not busy)
+        m.addSeparator()
+        a = m.addAction("收起棋盘", self.collapse)
+        a.setEnabled(not busy)
+        m.addAction("退出", self.app.quit)
+        m.exec(e.globalPos())
 
     # ---------- 逻辑 ----------
     def tick(self):
         ms = self.clock.elapsed()
         dt = min(0.05, (ms - self.last_ms) / 1000.0)
         self.last_ms = ms
+        if not self.isVisible():
+            return
         self.now += dt
         self.state_t += dt
         self.fade_t = max(0.0, self.fade_t - dt / FADE_TIME)
         self.land_t = max(0.0, self.land_t - dt / LAND_TIME)
         self.glow_t = max(0.0, self.glow_t - dt / 1.2)
         self.bubble_left -= dt
+        self.expr.update(dt)
 
         if self.state == "rolling":
             # 每 70ms 换一个面，越到后面越慢
@@ -319,6 +355,7 @@ class BoardWindow(QWidget):
         self.paint_center(p)
         self.paint_dice(p)
         self.paint_fish(p)
+        self.paint_collapse(p)
         self.paint_bubble(p)
 
     def paint_panel(self, p):
@@ -326,6 +363,15 @@ class BoardWindow(QWidget):
         p.setPen(QPen(QColor(120, 160, 210, 200), 2))
         p.setBrush(QColor(255, 251, 242, 238))
         p.drawRoundedRect(rc, 22, 22)
+
+    def paint_collapse(self, p):
+        rc = self.collapse_rect()
+        p.setPen(QPen(QColor(120, 160, 210, 220), 1.5))
+        p.setBrush(QColor(255, 255, 255, 235))
+        p.drawRoundedRect(rc, 15, 15)
+        p.setFont(ui_font(13, bold=True))
+        p.setPen(QColor(70, 110, 170) if self.state == "idle" else QColor(170, 175, 190))
+        p.drawText(rc, Qt.AlignmentFlag.AlignCenter, "收起 ▾")
 
     def paint_tile(self, p, i):
         icon, name, color = TILE_TYPES[LAYOUT[i]]
@@ -339,38 +385,26 @@ class BoardWindow(QWidget):
         p.setBrush(color.lighter(115))
         p.drawRoundedRect(rc, 12, 12)
 
-        f = QFont(self.emoji_font)
-        f.setPixelSize(26)
-        p.setFont(f)
+        p.setFont(emoji_font(26))
         p.drawText(QRectF(rc.x(), rc.y() + 4, rc.width(), 34), Qt.AlignmentFlag.AlignCenter, icon)
-        f = QFont(self.ui_font)
-        f.setPixelSize(12)
-        f.setBold(True)
-        p.setFont(f)
+        p.setFont(ui_font(12, bold=True))
         p.setPen(color.darker(220))
         p.drawText(QRectF(rc.x(), rc.bottom() - 24, rc.width(), 20), Qt.AlignmentFlag.AlignCenter, name)
 
     def paint_center(self, p):
         inner = self.inner_rect().adjusted(14, 14, -14, -14)
-        f = QFont(self.ui_font)
-        f.setPixelSize(24)
-        f.setBold(True)
-        p.setFont(f)
+        p.setFont(ui_font(24, bold=True))
         p.setPen(QColor(60, 100, 160))
         p.drawText(QRectF(inner.x(), inner.y() + 6, inner.width(), 34), Qt.AlignmentFlag.AlignCenter,
                    "大肥鱼飞行棋")
 
-        f.setPixelSize(13)
-        f.setBold(False)
-        p.setFont(f)
+        p.setFont(ui_font(13))
         p.setPen(QColor(120, 130, 150))
-        hint = "点骰子 / 空格 掷骰 · 右键菜单 · 拖动空白处移动"
+        hint = "点骰子 / 空格 掷骰 · 右键菜单 · Esc 收起"
         p.drawText(QRectF(inner.x(), self.dice_rect().bottom() + 18, inner.width(), 20),
                    Qt.AlignmentFlag.AlignCenter, hint)
 
-        f.setPixelSize(15)
-        f.setBold(True)
-        p.setFont(f)
+        p.setFont(ui_font(15, bold=True))
         p.setPen(QColor(80, 90, 110))
         status = f"🐟 小鱼干 × {self.coins}    第 {self.turn} 回合"
         if self.skip_next:
@@ -423,13 +457,14 @@ class BoardWindow(QWidget):
             u = min(1.0, self.state_t / HOP_TIME)
             a = self.tile_anchor(self.hop_from)
             ground = QPointF(a.x() + (ground.x() - a.x()) * u, a.y() + (ground.y() - a.y()) * u)
-        air = max(0.0, ground.y() - y)
+        ex, ey, erot, esx, esy = self.expr.body(FISH_H)
+        air = max(0.0, ground.y() - y - ey)
 
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(0, 0, 0, int(55 - air * 0.6)))
-        p.drawEllipse(ground, 26 - air * 0.25, 7 - air * 0.06)
+        p.setBrush(QColor(0, 0, 0, int(max(10, 55 - air * 0.6))))
+        p.drawEllipse(QPointF(ground.x() + ex, ground.y()), max(8, 26 - air * 0.25), max(3, 7 - air * 0.06))
 
-        # 呼吸 + 落地挤压 + 空中拉伸
+        # 呼吸 + 落地挤压 + 空中拉伸 + 表情动作
         sy = 1.0 + 0.02 * math.sin(self.now * 2.5)
         sx = 1.0
         if self.land_t > 0:
@@ -441,33 +476,38 @@ class BoardWindow(QWidget):
             sy += stretch
             sx -= stretch * 0.5
         sway = math.sin(self.now * 9.0) * 4 if hopping else math.sin(self.now * 2.5) * 1.5
+        fx, fy = x + ex, y + ey
 
         def draw_one(key, opacity):
             name, facing = key
             pix = self.sprites[name]
-            w = pix.width() / pix.devicePixelRatio()
-            h = pix.height() / pix.devicePixelRatio()
+            w, h = pix_size(pix)
             p.save()
             p.setOpacity(opacity)
-            p.translate(x, y)
-            p.rotate(sway)
-            p.scale(sx * facing, sy)
+            p.translate(fx, fy)
+            p.rotate(sway + erot)
+            p.scale(sx * esx * facing, sy * esy)
             p.drawPixmap(QRectF(-w / 2, -h, w, h), pix, QRectF(pix.rect()))
             p.restore()
 
-        if self.fade_t > 0 and self.prev_key:
-            draw_one(self.prev_key, self.fade_t)
-        draw_one(self.sprite_key(), 1.0 - self.fade_t * 0.5)
+        view = self.expr.view()
+        if view:
+            draw_one(view, 1.0)
+        else:
+            if self.fade_t > 0 and self.prev_key:
+                draw_one(self.prev_key, self.fade_t)
+            draw_one(self.sprite_key(), 1.0 - self.fade_t * 0.5)
+        self.expr.draw_overlay(p, fx, fy - FISH_H * sy * esy, FISH_H)
 
     def paint_bubble(self, p):
         if self.bubble_left <= 0 or not self.bubble_text:
             return
-        f = QFont(self.ui_font)
-        f.setPixelSize(14)
+        f = ui_font(14)
         fm = QFontMetrics(f)
         bw = fm.horizontalAdvance(self.bubble_text) + 24
         bh = fm.height() + 14
-        tip = QPointF(self.fish_xy.x(), self.fish_xy.y() - FISH_H - 6)
+        head_gap = FISH_H * (0.36 if self.expr.active else 0.06)
+        tip = QPointF(self.fish_xy.x(), self.fish_xy.y() - FISH_H - head_gap)
         bx = max(6.0, min(WIN_W - bw - 6, tip.x() - bw / 2))
         by = max(6.0, tip.y() - bh - 8)
         alpha = int(240 * min(1.0, self.bubble_left / 0.3))
@@ -485,16 +525,6 @@ class BoardWindow(QWidget):
         p.drawText(QRectF(bx, by, bw, bh), Qt.AlignmentFlag.AlignCenter, self.bubble_text)
 
 
-def main():
-    app = QApplication(sys.argv)
-    app.setWindowIcon(QIcon(os.path.join(SPRITE_DIR, "icon.png")))
-    w = BoardWindow()
-    screen = app.primaryScreen().availableGeometry()
-    w.move(screen.center().x() - WIN_W // 2, screen.center().y() - WIN_H // 2)
-    w.show()
-    w.activateWindow()
-    sys.exit(app.exec())
-
-
 if __name__ == "__main__":
-    main()
+    import main
+    main.main()
