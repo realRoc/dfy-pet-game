@@ -19,7 +19,8 @@ class BoardState:
             node = graph.legacy_node(cfg.get("board_pos", 0) or 0)
         return cls(node_id=node,
                    coins=int(cfg.get("board_coins", 0) or 0),
-                   turn=int(cfg.get("board_turn", 0) or 0))
+                   turn=int(cfg.get("board_turn", 0) or 0),
+                   skip_next=bool(cfg.get("board_skip_next", False)))
 
     def to_cfg(self, graph):
         return {
@@ -29,4 +30,5 @@ class BoardState:
             "board_pos": graph.order.index(self.node_id),
             "board_coins": self.coins,
             "board_turn": self.turn,
+            "board_skip_next": self.skip_next,   # 下回合暂停，存档里也要记住，重启不能绕过
         }

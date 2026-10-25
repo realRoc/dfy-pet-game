@@ -133,8 +133,9 @@ class BoardWindow(QWidget):
         if self.board is None:
             self.board = BoardState.from_cfg(self.cfg, self.graph)
         else:
-            # 换了地图：小鱼干和回合保留，从新地图起点出发
-            self.board = BoardState(node_id=self.graph.start, coins=self.board.coins, turn=self.board.turn)
+            # 换了地图：小鱼干、回合和暂停保留，从新地图起点出发
+            self.board = BoardState(node_id=self.graph.start, coins=self.board.coins, turn=self.board.turn,
+                                    skip_next=self.board.skip_next)
         self.hop_from = self.hop_to = self.board.node_id
         self.fish_xy = self.tile_anchor(self.board.node_id)
         self.fit_to_screen(QApplication.primaryScreen())

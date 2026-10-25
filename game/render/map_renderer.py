@@ -1,6 +1,7 @@
 """地图绘制：地面层（海、地形、河、道路、平面装饰）+ 立体物件（建筑、树等贴图）。
 
 - 地面层按 CHUNK 大小分块，按当前缩放和屏幕像素比渲染后缓存，镜头移动时只画看得见的块
+- 地面块和缩好的贴图都按字节数做 LRU，Retina + 多档缩放巡图也不会无限涨
 - 立体物件不进缓存，每帧和角色一起按脚底 y 排序绘制，才能前后遮挡
 - 有纹理时地形用纹理平铺，没有时退回纯色 + 程序纹理
 """
@@ -26,9 +27,47 @@ DEFAULT_PALETTE = {
 CORNER = 28
 CHUNK = 512
 CHUNK_BLEED = 4           # 每块多画一圈，缩放采样时边上不会混进透明像素出现接缝
-CHUNK_CACHE = 160
+CHUNK_CACHE_BYTES = 128 << 20     # 地面块缓存上限
+SPRITE_CACHE_BYTES = 64 << 20     # 缩好的贴图缓存上限
 TEX_SCALE = 0.55          # 纹理 1 像素在世界里的大小
 SPRITE_FOOT = (0.5, 0.94)  # 贴图脚底在图里的默认位置（归一化）
+
+
+def pixmap_bytes(pix):
+    return pix.width() * pix.height() * 4
+
+
+class PixmapCache:
+    """按字节数限制的 LRU（QPixmap 按 宽×高×4 估算）。"""
+
+    def __init__(self, limit):
+        self.limit, self.size = limit, 0
+        self._items = OrderedDict()
+
+    def __len__(self):
+        return len(self._items)
+
+    def get(self, key):
+        pix = self._items.get(key)
+        if pix is not None:
+            self._items.move_to_end(key)
+        return pix
+
+    def put(self, key, pix):
+        self.pop(key)
+        self._items[key] = pix
+        self.size += pixmap_bytes(pix)
+        while self.size > self.limit and len(self._items) > 1:   # 至少留下刚放进来的
+            self.pop(next(iter(self._items)))
+
+    def pop(self, key):
+        pix = self._items.pop(key, None)
+        if pix is not None:
+            self.size -= pixmap_bytes(pix)
+
+    def drop_if(self, cond):
+        for key in [k for k in self._items if cond(k)]:
+            self.pop(key)
 
 
 class SpriteObject:
@@ -48,8 +87,9 @@ class MapRenderer:
         self.graph = graph
         self.art = graph.art
         self.pal = {k: QColor(v) for k, v in {**DEFAULT_PALETTE, **self.art.get("palette", {})}.items()}
-        self._chunks = OrderedDict()
-        self._scaled = {}
+        self._chunks = PixmapCache(CHUNK_CACHE_BYTES)
+        self._chunk_scale = None
+        self._scaled = PixmapCache(SPRITE_CACHE_BYTES)
         self._textures = {k: QPixmap(v) for k, v in self.art.get("textures", {}).items()}
         self._sprites = {sid: QPixmap(s["path"]) for sid, s in self.art.get("sprites", {}).items()}
         self.objects = self._build_objects()
@@ -72,9 +112,7 @@ class MapRenderer:
             pix = self._sprites[sid].scaled(max(1, key[1]), max(1, key[2]),
                                             Qt.AspectRatioMode.IgnoreAspectRatio,
                                             Qt.TransformationMode.SmoothTransformation)
-            if len(self._scaled) > 400:
-                self._scaled.clear()
-            self._scaled[key] = pix
+            self._scaled.put(key, pix)
         return pix
 
     def _build_objects(self):
@@ -109,17 +147,17 @@ class MapRenderer:
         x0, y0 = max(0, int(view.left() // CHUNK)), max(0, int(view.top() // CHUNK))
         x1 = min(int(math.ceil(cw / CHUNK)) - 1, int(view.right() // CHUNK))
         y1 = min(int(math.ceil(ch / CHUNK)) - 1, int(view.bottom() // CHUNK))
+        if (sx, sy) != self._chunk_scale:
+            # 换了缩放档位：别的档位的块短时间用不上，先腾出来
+            self._chunk_scale = (sx, sy)
+            self._chunks.drop_if(lambda k: k[2:] != (sx, sy))
         for cy in range(y0, y1 + 1):
             for cx in range(x0, x1 + 1):
                 key = (cx, cy, sx, sy)
                 pix = self._chunks.get(key)
                 if pix is None:
                     pix = self._render_chunk(cx, cy, sx, sy)
-                    self._chunks[key] = pix
-                    if len(self._chunks) > CHUNK_CACHE:
-                        self._chunks.popitem(last=False)
-                else:
-                    self._chunks.move_to_end(key)
+                    self._chunks.put(key, pix)
                 rc = QRectF(cx * CHUNK, cy * CHUNK, CHUNK, CHUNK)
                 span = CHUNK + CHUNK_BLEED * 2
                 kx, ky = pix.width() / span, pix.height() / span

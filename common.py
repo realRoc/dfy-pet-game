@@ -41,6 +41,7 @@ DEFAULT_CFG = {
     "board_pos": 0,
     "board_coins": 0,
     "board_turn": 0,
+    "board_skip_next": False,   # 下回合暂停（恶作剧、睡着等事件）
     "dice_skin": None,          # content/dice/ 下的皮肤目录名；为空时用地图默认的骰子
 }
 

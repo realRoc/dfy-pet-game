@@ -123,6 +123,28 @@ class SaveCompatTest(unittest.TestCase):
         self.assertEqual((cfg["board_pos"], cfg["board_node"], cfg["board_map"]), (17, "m17", "classic"))
         self.assertEqual(BoardState.from_cfg(cfg, self.graph), st)
 
+    def test_round_trip_keeps_skip_next(self):
+        st = BoardState(node_id="m16", coins=2, turn=5, skip_next=True)
+        cfg = st.to_cfg(self.graph)
+        self.assertTrue(cfg["board_skip_next"])
+        self.assertEqual(BoardState.from_cfg(cfg, self.graph), st)
+        # 老存档没有这个字段：不暂停
+        self.assertFalse(BoardState.from_cfg({"board_node": "m16"}, self.graph).skip_next)
+
+    def test_skip_survives_restart(self):
+        """落地置位 → 退出保存 → 重启恢复 → 下一回合被消耗，再下一回合正常掷骰。"""
+        rules = Rules(self.graph, load_tiles(), rng=random.Random(1))
+        st = BoardState(node_id="m16")          # 恶作剧格
+        rules.land(st)
+        self.assertTrue(st.skip_next)
+        cfg = st.to_cfg(self.graph)
+        st = BoardState.from_cfg(cfg, self.graph)
+        self.assertTrue(st.skip_next)
+        self.assertIsNone(rules.begin_turn(st))
+        self.assertFalse(st.skip_next)
+        self.assertFalse(BoardState.from_cfg(st.to_cfg(self.graph), self.graph).skip_next)
+        self.assertIn(rules.begin_turn(st), range(1, 7))
+
     def test_unknown_node_or_other_map(self):
         st = BoardState.from_cfg({"board_node": "zz", "board_pos": 2}, self.graph)
         self.assertEqual(st.node_id, "m02")
