@@ -23,7 +23,7 @@ class Landing:
     kind: str
     coins: int = 0
     say: str = ""
-    expression: str = ""   # 表情 key，"random" 表示随机，空为不做
+    expression: str = ""   # 表情 key 或动作动画名，"random" 表示随机，空为不做
     path: list = field(default_factory=list)   # 强制移动经过的节点（不含出发点），最后一个是新位置
     warp_to: str = ""      # 传送到的节点
 

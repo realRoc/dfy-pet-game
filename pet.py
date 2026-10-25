@@ -3,6 +3,7 @@
 移植自 1190fasheqi/dafeiyu-pet 的 桌宠.py（MIT），改动：
 - macOS 适配：鼠标穿透改用 Qt 自带标志，开机自启用 LaunchAgent，字体按平台选
 - 新增「做个表情」「喂食」「说句话」「设置城市」菜单和表情动作（expressions.py）
+- 新增 dsh-pet 的动作动画（舞狮、玩玩具汽车……，clips.py），放进「做个表情」，闲着时也会自己播
 - 新增「打开飞行棋」，和棋盘窗口来回切换
 - 天气查询改到后台线程，不卡界面
 """
@@ -25,6 +26,8 @@ from PySide6.QtWidgets import (QApplication, QWidget, QMenu, QSystemTrayIcon, QM
 from common import (APP_DIR, SPRITE_DIR, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
                     emoji_font, float_flags, load_sprites, pix_size)
 from expressions import EXPRESSIONS, ExpressionPlayer
+import clips
+from clips import ClipPlayer
 
 try:
     import pynvml
@@ -275,6 +278,7 @@ class PetWindow(QWidget):
                 self.sprites[(name, h)] = pix
         self.icon = QIcon(os.path.join(SPRITE_DIR, "icon.png"))
         self.cur_h = int(SPRITE_SRC_H * self.cfg["size"])
+        self.clip = ClipPlayer()
         self._layout_for_size()
 
         # 状态
@@ -334,12 +338,25 @@ class PetWindow(QWidget):
         self.move(int(x), int(y))
 
     def _layout_for_size(self):
-        """窗口比鱼大一圈：头顶留气泡和表情符号的位置，两侧留表情的位置。"""
+        """窗口比鱼大一圈：头顶留气泡和表情符号的位置，两侧留表情的位置。
+        播动作动画时按动画画面再撑大（放风筝、吹气球这些比人宽得多），播完缩回来。"""
         self.side = int(self.cur_h * 0.42)
         self.head_room = max(BUBBLE_H + MARGIN, int(self.cur_h * 0.32) + 12)
         sprite_w = max(pix_size(p)[0] for k, p in self.sprites.items() if k[1] == self.cur_h)
         self.win_w = int(sprite_w) + self.side * 2
-        self.setFixedSize(self.win_w, self.head_room + self.cur_h + MARGIN + 10)
+        foot_room = MARGIN + 10
+        if self.clip.active:
+            left, right, up, down = self.clip.extents(self.cur_h)
+            self.win_w = max(self.win_w, int(2 * max(left, right)) + 8)
+            self.head_room = max(self.head_room, int(up - self.cur_h) + BUBBLE_H + MARGIN)
+            foot_room = max(foot_room, int(down) + MARGIN)
+        self.setFixedSize(self.win_w, self.head_room + self.cur_h + foot_room)
+
+    def _relayout(self):
+        """改窗口大小，脚底位置不动。"""
+        foot = self.foot_global()
+        self._layout_for_size()
+        self.place_foot_at(foot)
 
     # ---------- 和棋盘切换用 ----------
     def foot_global(self):
@@ -443,7 +460,11 @@ class PetWindow(QWidget):
 
         cur_key = self._sprite_key()
         view = self.expr.view()
-        if view:
+        if self.clip.active:
+            # 动作动画开头结尾和正面图交叉淡化
+            draw_one(cur_key, 1.0 - self.clip.blend())
+            self.clip.draw(p, cx, bottom, self.cur_h)
+        elif view:
             draw_one((view[0], self.cur_h, view[1]), 1.0)
         elif self.cross_t > 0:
             draw_one(self.prev_key, self.cross_t)
@@ -524,9 +545,15 @@ class PetWindow(QWidget):
             if self.action_t == 0:
                 self.action = None
         self.expr.update(TICK / 1000.0)
+        if self.clip.active:
+            self.clip.update(TICK / 1000.0)
+            if not self.clip.active:
+                self._relayout()
+                self.rest_until = self.t * TICK + random.randint(3000, 8000)   # 播完先站一会儿再走
+        busy = self.expr.active or self.clip.active
 
-        if self.chat_paused or self.dragging or self.expr.active:
-            if self.expr.active:
+        if self.chat_paused or self.dragging or busy:
+            if busy:
                 self.target = None
                 self.cur_speed = 0.0
             self.update()
@@ -590,13 +617,16 @@ class PetWindow(QWidget):
                 self.action, self.action_t = "sway", 1.0
             elif pick < 0.65:
                 self.action, self.action_t = "stretch", 1.0
-            elif pick < 0.75:
+            elif pick < 0.7:
                 # 偶尔自己冒个表情，不说话
                 self.expr.start()
-            elif pick < 0.85:
+            elif pick < 0.8:
+                if clips.AVAILABLE:
+                    self.play_clip()
+            elif pick < 0.9:
                 if self.t - self.last_speak_tick >= 1500:
                     self.last_speak_tick = self.t
-                    if pick < 0.77:
+                    if pick < 0.82:
                         self.say(random.choice(INNER_LINES), inner=True)
                     else:
                         self.say(random.choice(LINES))
@@ -615,12 +645,37 @@ class PetWindow(QWidget):
         self.update()
 
     def play_expression(self, key=None):
+        self.stop_clip()
         self.chat_paused = False
         self.jump_t = 0
         self._set_dir("down", 1)
         _, line = self.expr.start(key)
         self.last_line = ""
         self.say(line)
+
+    def play_clip(self, name=None):
+        """播一段动作动画（不传则随机）。"""
+        self.expr.stop()
+        self.chat_paused = False
+        self.jump_t = 0
+        self.action = None
+        self._set_dir("down", 1)
+        self.cross_t = 0.0
+        if self.clip.start(name):
+            self._relayout()
+
+    def play_random(self):
+        """「做个表情 → 随机」：表情和动作动画一起抽。"""
+        n = len(EXPRESSIONS)
+        if clips.AVAILABLE and random.random() < len(clips.CLIPS) / (n + len(clips.CLIPS)):
+            self.play_clip()
+        else:
+            self.play_expression()
+
+    def stop_clip(self):
+        if self.clip.active:
+            self.clip.stop()
+            self._relayout()
 
     def check_system_status(self):
         now = self.t * TICK
@@ -663,6 +718,7 @@ class PetWindow(QWidget):
             if not self.dragging and delta.manhattanLength() > 6:
                 self.dragging = True
                 self.expr.stop()
+                self.stop_clip()
                 self.drag_offset = e.globalPosition().toPoint() - QPoint(self.x(), self.y())
             if self.dragging and self.drag_offset is not None:
                 self.move(e.globalPosition().toPoint() - self.drag_offset)
@@ -710,6 +766,7 @@ class PetWindow(QWidget):
 
     def on_food(self, food):
         self.food_panel.hide()
+        self.stop_clip()
         self._set_dir("down", 1)
         self.expr.start_eat(food)
         self.jump_t = 0.6
@@ -750,10 +807,11 @@ class PetWindow(QWidget):
         m = QMenu(self)
         m.addAction("🎲 打开飞行棋", self.app.open_board)
         expr_menu = m.addMenu("做个表情")
-        expr_menu.addAction("随机", self.play_expression)
+        expr_menu.addAction("随机", self.play_random)
         expr_menu.addSeparator()
         for key, (name, _, _) in EXPRESSIONS.items():
             expr_menu.addAction(name, lambda k=key: self.play_expression(k))
+        clips.add_menus(expr_menu, self.play_clip)
         m.addAction("喂食", self.open_food_panel)
         m.addAction("说句话", lambda: self.say(random.choice(LINES)))
         m.addSeparator()

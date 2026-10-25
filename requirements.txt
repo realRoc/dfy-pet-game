@@ -1,5 +1,6 @@
 PySide6-Essentials>=6.5
 requests
+av
 psutil
 tomli; python_version < "3.11"
 nvidia-ml-py; sys_platform == "win32"

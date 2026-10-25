@@ -22,6 +22,8 @@ from PySide6.QtWidgets import QApplication, QWidget, QMenu
 
 from common import ui_font, float_flags, load_sprites, pix_size
 from expressions import EXPRESSIONS, ExpressionPlayer
+import clips
+from clips import ClipPlayer
 from game.content import CONTENT_DIR, ContentError, load_dice_skin, load_map, load_tiles, map_names
 from game.core.rules import Rules
 from game.core.state import BoardState
@@ -90,6 +92,7 @@ class BoardWindow(QWidget):
         self.prev_key, self.fade_t = None, 0.0
         self.land_t = 0.0
         self.expr = ExpressionPlayer()
+        self.clip = ClipPlayer()
 
         # 动画阶段: idle / rolling / settle / moving / choose / forced（事件强制移动）/ warp（事件传送）
         self.state = "idle"
@@ -325,6 +328,7 @@ class BoardWindow(QWidget):
         if self.state != "idle":
             return
         self.expr.stop()
+        self.clip.stop()
         self.recenter()
         result = self.rules.begin_turn(self.board)
         if result is None:
@@ -366,10 +370,31 @@ class BoardWindow(QWidget):
     def play_expression(self, key=None):
         if self.state != "idle":
             return
+        self.clip.stop()
         self.set_dir("down")
         name, line = self.expr.start(key)
         self.say(line, self.expr.dur + 0.6)
         return name
+
+    def play_clip(self, name=None):
+        """播一段动作动画（不传则随机），返回菜单里的名字。"""
+        if self.state != "idle":
+            return
+        self.expr.stop()
+        self.set_dir("down")
+        self.fade_t = 0.0
+        name = self.clip.start(name)
+        return clips.label(name) if name else None
+
+    def play_random(self):
+        """「做个表情 → 随机」和问号格：表情和动作动画一起抽。"""
+        n = len(EXPRESSIONS)
+        if clips.AVAILABLE and random.random() < len(clips.CLIPS) / (n + len(clips.CLIPS)):
+            name = self.play_clip()
+            if name:
+                self.say(f"【{name}】", 3.0)
+                return
+        self.play_expression()
 
     def collapse(self):
         if self.state == "idle":
@@ -427,10 +452,17 @@ class BoardWindow(QWidget):
         self.glow_node, self.glow_t = self.board.node_id, 1.0
         here = self.board.node_id
         landing = self.rules.land(self.board)
-        if landing.expression:
+        if landing.expression in clips.CLIPS:
+            self.clip.start(landing.expression)
+            self.say(landing.say or f"【{clips.label(landing.expression)}】", 3.0)
+        elif landing.expression:
             key = landing.expression if landing.expression in EXPRESSIONS else None
-            name, line = self.expr.start(key)
-            self.say(landing.say or f"【{name}】{line}", max(3.0, self.expr.dur + 0.8))
+            # 问号格不指定表情：表情和动作动画一起抽
+            if key is None and clips.AVAILABLE and random.random() < 0.5 and self.clip.start():
+                self.say(landing.say or f"【{clips.label(self.clip.name)}】", 3.0)
+            else:
+                name, line = self.expr.start(key)
+                self.say(landing.say or f"【{name}】{line}", max(3.0, self.expr.dur + 0.8))
         elif landing.say:
             self.say(landing.say, 3.0)
         # 位置在 land() 里已经改好，这里只播动画
@@ -541,10 +573,11 @@ class BoardWindow(QWidget):
         m.addAction("镜头回到大肥鱼", self.recenter)
         expr_menu = m.addMenu("做个表情")
         expr_menu.setEnabled(not busy)
-        expr_menu.addAction("随机", self.play_expression)
+        expr_menu.addAction("随机", self.play_random)
         expr_menu.addSeparator()
         for key, (name, _, _) in EXPRESSIONS.items():
             expr_menu.addAction(name, lambda k=key: self.play_expression(k))
+        clips.add_menus(expr_menu, self.play_clip)
         map_menu = m.addMenu("换地图")
         map_menu.setEnabled(not busy)
         for map_id, name in map_names().items():
@@ -582,6 +615,7 @@ class BoardWindow(QWidget):
         self.glow_t = max(0.0, self.glow_t - dt / 1.2)
         self.bubble_left -= dt
         self.expr.update(dt)
+        self.clip.update(dt)
 
         if self.state == "rolling":
             if self.skin.style == "flat":
@@ -940,7 +974,10 @@ class BoardWindow(QWidget):
             p.restore()
 
         view = self.expr.view()
-        if view:
+        if self.clip.active:
+            draw_one(self.sprite_key(), 1.0 - self.clip.blend())
+            self.clip.draw(p, fx, fy, self.fish_h * self.fish_scale)
+        elif view:
             draw_one(view, 1.0)
         else:
             if self.fade_t > 0 and self.prev_key:
@@ -956,6 +993,8 @@ class BoardWindow(QWidget):
         bw = fm.horizontalAdvance(self.bubble_text) + 28
         bh = fm.height() + 16
         head_gap = self.fish_h * (0.36 if self.expr.active else 0.06)
+        if self.clip.active:
+            head_gap = max(head_gap, self.clip.extents(self.fish_h)[2] - self.fish_h + self.fish_h * 0.06)
         ground = self.ground_point()
         tip = self.to_screen(ground) + QPointF(self.fish_xy.x() - ground.x(),
                                                 self.fish_xy.y() - ground.y() - self.fish_h - head_gap) * self.zoom

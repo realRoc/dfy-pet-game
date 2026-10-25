@@ -58,6 +58,7 @@ class PetApp:
         self.pet.function_panel.hide()
         self.pet.food_panel.hide()
         self.pet.chat_dialog.hide()
+        self.pet.stop_clip()
         self.board.place_fish_at(self.pet.foot_global())
         self.pet.hide()
         self._show(self.board)
@@ -67,6 +68,7 @@ class PetApp:
     def collapse_board(self):
         if not self.board.isVisible():
             return
+        self.board.clip.stop()
         foot = self.board.foot_global()
         self.board.save_state()
         self.board.hide()
