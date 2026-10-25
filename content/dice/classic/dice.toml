@@ -1,0 +1,19 @@
+# 经典白骰子：白底圆角、深蓝点、1 点红色。
+# 尺寸按 size 这个参考边长给，绘制时按实际大小缩放。
+# 换皮肤：复制这个目录改颜色；想用贴图就放 1.png~6.png 并写 face_dir = "faces"。
+
+name = "经典白"
+size = 84
+radius = 16
+border_width = 3
+body = "#FFFFFF"
+border_hot = "#5A8CD2"
+border_idle = "#AAAFBE"
+pip = "#32466E"
+pip_one = "#E14650"
+pip_r = 7
+pip_one_r = 9
+pip_spread = 22
+shadow_alpha = 40
+roll_time = 0.8
+settle_time = 0.35

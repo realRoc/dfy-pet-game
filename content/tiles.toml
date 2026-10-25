@@ -1,0 +1,77 @@
+# 格子类型：外观 + 落地事件
+# 落地时从 events 里随机抽一条：coins 加减小鱼干，say 是台词，skip_next 让下回合暂停。
+# 小游戏还没做，现在先用台词 + 奖励占位。
+
+[types.start]
+name = "起点"
+icon = "🏁"
+color = "#FFD666"
+
+[types.mystery]
+name = "问号"
+icon = "❓"
+color = "#78D7CD"
+random_expression = true
+
+[types.fish]
+name = "钓鱼"
+icon = "🎣"
+color = "#8CC8FF"
+events = [
+  { coins = 2, say = "钓到星星小鱼！+2 小鱼干" },
+  { coins = 1, say = "钓到一只迷你鱼……也算吧 +1" },
+]
+
+[types.ring]
+name = "套圈"
+icon = "🎯"
+color = "#FFAAA0"
+events = [
+  { coins = 1, say = "套中了！小勋章到手 +1" },
+  { coins = 0, say = "差一点点……下次一定" },
+]
+
+[types.candy]
+name = "接糖果"
+icon = "🍬"
+color = "#FFBEE1"
+events = [
+  { coins = 1, say = "接住糖果！甜到冒泡泡～ +1" },
+  { coins = 2, say = "糖果雨！嘎嘣脆 +2" },
+]
+
+[types.riddle]
+name = "猜谜"
+icon = "🧩"
+color = "#B4E1A0"
+events = [
+  { coins = 1, say = "答对了！我果然是大聪明 +1" },
+  { coins = 0, say = "这题超纲了，我先去吃饭" },
+]
+
+[types.chest]
+name = "宝箱"
+icon = "🎁"
+color = "#FFC878"
+events = [
+  { coins = 3, say = "宝箱里是钻石？！+3" },
+  { coins = 1, say = "开出一个小发卡 +1" },
+  { coins = 2, say = "金币闪闪 +2" },
+]
+
+[types.rest]
+name = "休息"
+icon = "🛋️"
+color = "#C8BEF5"
+events = [
+  { say = "躺一会儿，心情回满～" },
+  { say = "大肥鱼坐的住" },
+]
+
+[types.prank]
+name = "恶作剧"
+icon = "😼"
+color = "#BEBECD"
+events = [
+  { say = "被泡泡裹住了！下回合歇着……", skip_next = true },
+]

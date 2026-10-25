@@ -69,11 +69,28 @@ python main.py
 |------|------|
 | `main.py` | 入口；管理桌宠和棋盘两个窗口的切换、托盘、配置保存 |
 | `pet.py` | 桌宠本体（移植自 dafeiyu-pet 的 `桌宠.py`） |
-| `board_game.py` | 飞行棋盘：格子、骰子、逐格跳动、格子事件 |
+| `board_game.py` | 飞行棋盘窗口：动画、绘制调度、输入 |
+| `game/core/` | 纯规则（不依赖 Qt）：地图图结构、骰子、回合与起点工资、存档兼容 |
+| `game/content/` | 读取并校验 `content/` 下的配置 |
+| `game/render/` | 格子、骰子绘制器 |
+| `content/tiles.toml` | 格子类型：名字、图标、颜色、落地事件 |
+| `content/maps/<地图>/map.toml` | 地图：节点、连线、坐标 |
+| `content/dice/<皮肤>/dice.toml` | 骰子皮肤：颜色、圆角、点位、动画时长，可选贴图 |
 | `expressions.py` | 表情动作，桌宠和棋盘共用 |
 | `common.py` | 路径、平台差异（字体、窗口标志）、配置、精灵加载 |
 | `sprites/` | 精灵图（来自 dafeiyu-pet） |
 | `启动大肥鱼飞行棋.command` | macOS 双击启动脚本 |
+
+## 换地图 / 换骰子皮肤
+
+- 新地图：复制 `content/maps/classic/` 改名后编辑 `map.toml`，再把 `config.json` 里的 `board_map` 改成目录名。
+- 新骰子：复制 `content/dice/classic/` 改颜色，或放 `1.png`~`6.png` 并写 `face_dir`；`config.json` 里的 `dice_skin` 改成目录名。
+- 改完先校验，配置写错时会指出是哪个文件哪一项：
+
+```bash
+python -m game.content check
+python -m unittest discover -s tests
+```
 
 ## 后续计划
 
