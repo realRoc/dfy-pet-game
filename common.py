@@ -88,15 +88,24 @@ def relaunch_in_mac_app():
         if not (os.path.isfile(exe) and filecmp.cmp(src, exe, shallow=False)):
             os.makedirs(os.path.dirname(exe), exist_ok=True)
             shutil.copy2(src, exe)
-            with open(os.path.join(contents, "Info.plist"), "wb") as f:
-                plistlib.dump({
-                    "CFBundleName": APP_NAME,
-                    "CFBundleDisplayName": APP_NAME,
-                    "CFBundleExecutable": APP_NAME,
-                    "CFBundleIdentifier": "io.github.dfy-pet-game",
-                    "CFBundlePackageType": "APPL",
-                    "NSHighResolutionCapable": True,
-                }, f)
+        # Info.plist 单独检查：上次可能复制完解释器就被打断，没写上或写坏了
+        plist = os.path.join(contents, "Info.plist")
+        info = {
+            "CFBundleName": APP_NAME,
+            "CFBundleDisplayName": APP_NAME,
+            "CFBundleExecutable": APP_NAME,
+            "CFBundleIdentifier": "io.github.dfy-pet-game",
+            "CFBundlePackageType": "APPL",
+            "NSHighResolutionCapable": True,
+        }
+        try:
+            with open(plist, "rb") as f:
+                plist_ok = plistlib.load(f) == info
+        except Exception:
+            plist_ok = False
+        if not plist_ok:
+            with open(plist, "wb") as f:
+                plistlib.dump(info, f)
         env = dict(os.environ, DFY_IN_APP="1", __PYVENV_LAUNCHER__=sys.executable)
         os.execve(exe, [exe, os.path.abspath(sys.argv[0])] + sys.argv[1:], env)
     except Exception as e:
