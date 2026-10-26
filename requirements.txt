@@ -2,5 +2,4 @@ PySide6-Essentials>=6.5
 requests
 av>=13,<20   # 实测 13.1（Python 3.9）到 19.0（Python 3.14）；新大版本先验证解码再放开
 psutil
-tomli; python_version < "3.11"
 nvidia-ml-py; sys_platform == "win32"

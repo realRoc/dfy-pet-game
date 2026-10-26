@@ -1,4 +1,4 @@
-"""dsh-pet 的动作动画（舞狮、玩玩具汽车、涮火锅……），桌宠和棋盘共用。
+"""dsh-pet 的动作动画（舞狮、玩玩具汽车、涮火锅……）。
 
 素材在 content/clips/（怎么来的见 tools/import_clips.py）：透明 webm，VP9 + alpha。
 webm 的 alpha 存在单独的 BlockAdditional 里，要用 libvpx-vp9 解码器才拿得到，所以用 PyAV（自带 libvpx）
