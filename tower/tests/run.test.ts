@@ -94,9 +94,12 @@ describe('a run', () => {
     expect(() => run.buy('cards', 0)).toThrow('卖完了');
     run.buy('relics', 0);
     expect(run.relics).toContain(shop.relics[0].id);
-    const size = run.deck.length;
+    const size = run.deck.length, gold = run.gold;
+    expect(() => run.buyRemoval(size)).toThrow('没有这张牌');  // 选错牌不扣 Token，服务也还能用
+    expect(run.gold).toBe(gold);
     run.buyRemoval(0);
     expect(run.deck).toHaveLength(size - 1);
+    expect(run.gold).toBe(gold - shop.removePrice);
     expect(() => run.buyRemoval(0)).toThrow();
     run.gold = 0;
     expect(() => run.buy('cards', 1)).toThrow('Token 不够');
@@ -113,8 +116,14 @@ describe('a run', () => {
     win(run);
     expect(run.reward!.removeCard).toBe(true);
     expect(run.reward!.cards.every(id => CARDS[id].rarity === 'rare')).toBe(true);
-    const size = run.deck.length;
-    run.takeReward(run.reward!.cards[0], 0);
+    const size = run.deck.length, rare = run.reward!.cards[0];
+    // 修 Bug 必须删一张：不选、选错位置、拿不存在的牌都拒绝，而且牌组原样不动
+    expect(() => run.takeReward(rare)).toThrow();
+    expect(() => run.takeReward(rare, size)).toThrow();
+    expect(() => run.takeReward('nope', 0)).toThrow();
+    expect(run.deck).toHaveLength(size);
+    expect(run.stage).toBe('reward');
+    run.takeReward(rare, 0);
     expect(run.deck).toHaveLength(size);  // one out, one in
     expect(run.stage).toBe('map');
   });

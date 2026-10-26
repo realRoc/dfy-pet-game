@@ -166,11 +166,13 @@ export class Run {
 
   takeReward(card: string | null, removeIndex?: number) {
     if (this.stage !== 'reward' || !this.reward) throw new Error('现在没有奖励可拿');
-    if (this.reward.removeCard && removeIndex !== undefined) this.removeCard(removeIndex);
-    if (card) {
-      if (!this.reward.cards.includes(card)) throw new Error('没有这张牌');
-      this.deck.push(card);
-    }
+    // Check everything before touching the deck, so a bad call leaves the reward as it was.
+    if (card && !this.reward.cards.includes(card)) throw new Error('没有这张牌');
+    if (this.reward.removeCard) {
+      if (removeIndex === undefined || !this.deck[removeIndex]) throw new Error('先选一张要删掉的牌');
+      this.removeCard(removeIndex);
+    } else if (removeIndex !== undefined) throw new Error('这次奖励不删牌');
+    if (card) this.deck.push(card);
     this.reward = null;
     this.leave();
   }
@@ -212,6 +214,7 @@ export class Run {
   chooseEvent(option: number, deckIndex?: number): string | null {
     if (this.stage !== 'event' || !this.event || this.event.result) throw new Error('现在没有事件');
     const opt = EVENT_BY_ID[this.event.id].options[option];
+    if (!opt) throw new Error('没有这个选项');
     const why = opt.can?.(this);
     if (why) throw new Error(why);
     if (opt.pick && deckIndex === undefined) throw new Error('先选一张牌');
@@ -245,10 +248,10 @@ export class Run {
     const s = this.shop;
     if (!s || s.removed) throw new Error('删牌服务今天用过了');
     if (this.gold < s.removePrice) throw new Error('Token 不够');
+    this.removeCard(deckIndex);  // throws on a bad index before any Token is spent
     this.gold -= s.removePrice;
     s.removed = true;
     this.removals++;
-    this.removeCard(deckIndex);
   }
 
   // ── deck and stats ───────────────────────────────────────────────────────

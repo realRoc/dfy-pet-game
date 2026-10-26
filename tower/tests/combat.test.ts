@@ -104,6 +104,20 @@ describe('虚弱 / 易伤', () => {
     expect(c.player.status.vulnerable).toBeUndefined();
   });
 
+  it('虚弱还没掉完时再被叠 1 层：旧的照常减，新的那层管下一个回合', () => {
+    const c = setup(Array(10).fill('tailSlap'));
+    c.start();
+    script(c, {kind: 'attackDebuff', dmg: 1, times: 1, status: 'weak', n: 1});
+    c.endTurn();
+    expect(c.player.status.weak).toBe(1);
+    script(c, {kind: 'attackDebuff', dmg: 1, times: 1, status: 'weak', n: 1});
+    c.endTurn();
+    expect(c.player.status.weak).toBe(1);
+    script(c, {kind: 'idle'});
+    c.endTurn();
+    expect(c.player.status.weak).toBeUndefined();
+  });
+
   it('敌人给的虚弱 1 正好管玩家一个回合', () => {
     const c = setup(Array(10).fill('tailSlap'));
     c.start();

@@ -42,8 +42,8 @@ export class Combat {
   private nextUid = 1;
   private events: GameEvent[] = [];
   private inPlayerTurn = false;
-  /** Debuffs enemies put on the player this round; they skip the round-end tick so they last through the player's next turn. */
-  private freshDebuffs = new Set<StatusId>();
+  /** Stacks enemies put on the player this round; only older stacks tick at round end, so new ones last through the player's next turn. */
+  private freshDebuffs = new Map<StatusId, number>();
 
   constructor(setup: CombatSetup) {
     this.rng = new Rng(setup.seed);
@@ -225,7 +225,7 @@ export class Combat {
   }
 
   applyStatus(u: Unit, status: StatusId, n: number) {
-    if (u === this.player && !this.inPlayerTurn && n > 0) this.freshDebuffs.add(status);
+    if (u === this.player && !this.inPlayerTurn && n > 0) this.freshDebuffs.set(status, (this.freshDebuffs.get(status) ?? 0) + n);
     u.status[status] = (u.status[status] ?? 0) + n;
     this.emit({t: 'status', unit: u.id, status, amount: n, value: u.status[status]!});
   }
@@ -384,9 +384,9 @@ export class Combat {
     this.emit({t: 'intent', unit: e.id, intent: e.intent, move: e.moveName});
   }
 
-  private tickDown(u: Unit, skip?: Set<StatusId>) {
+  private tickDown(u: Unit, fresh?: Map<StatusId, number>) {
     for (const s of ['weak', 'vulnerable'] as const) {
-      if (u.status[s] && !skip?.has(s)) this.applyStatus(u, s, -1);
+      if ((u.status[s] ?? 0) - (fresh?.get(s) ?? 0) > 0) this.applyStatus(u, s, -1);
       if (u.status[s] === 0) delete u.status[s];
     }
   }
