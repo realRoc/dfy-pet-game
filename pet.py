@@ -16,13 +16,13 @@ import threading
 
 import psutil
 import requests
-from PySide6.QtCore import Qt, QTimer, QPoint, QPointF, QRectF
-from PySide6.QtGui import QPainter, QFont, QColor, QIcon, QFontMetrics, QPolygonF
+from PySide6.QtCore import Qt, QTimer, QPoint, QPointF, QRectF, QUrl
+from PySide6.QtGui import QPainter, QFont, QColor, QIcon, QFontMetrics, QPolygonF, QDesktopServices
 from PySide6.QtWidgets import (QApplication, QWidget, QMenu, QSystemTrayIcon, QMessageBox,
                                QInputDialog, QLineEdit, QHBoxLayout, QVBoxLayout, QPushButton,
                                QFrame, QDialog, QToolButton)
 
-from common import (APP_DIR, SPRITE_DIR, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
+from common import (APP_DIR, SPRITE_DIR, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
                     emoji_font, float_flags, load_sprites, pix_size)
 from expressions import EXPRESSIONS, ExpressionPlayer
 import clips
@@ -173,7 +173,7 @@ class ChatDialog(QDialog):
 
 
 class FunctionPanel(QFrame):
-    """单击弹出的功能列表：聊天"""
+    """单击弹出的功能列表：聊天 / 爬塔"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(float_flags())
@@ -197,7 +197,7 @@ class FunctionPanel(QFrame):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(2)
 
-        for icon, tip, fn in (("🗨️", "聊天", self._on_chat_clicked),):
+        for icon, tip, fn in (("🗨️", "聊天", self._on_chat_clicked), ("🗼", "爬塔", self._on_tower_clicked)):
             b = QPushButton(icon)
             b.setFont(emoji_font(26))
             b.setToolTip(tip)
@@ -205,13 +205,18 @@ class FunctionPanel(QFrame):
             b.clicked.connect(fn)
             layout.addWidget(b)
 
-        self.setFixedSize(68, 60)
+        self.setFixedSize(122, 60)
         self.hide()
 
     def _on_chat_clicked(self):
         self.hide()
         if self.parent():
             self.parent()._show_chat_dialog()
+
+    def _on_tower_clicked(self):
+        self.hide()
+        if self.parent():
+            self.parent().open_tower()
 
     def popup_at(self, x, y):
         self.move(int(x), int(y))
@@ -798,8 +803,18 @@ class PetWindow(QWidget):
 
         threading.Thread(target=worker, daemon=True).start()
 
+    def open_tower(self):
+        """在系统浏览器里打开爬塔。它是独立的网页游戏，和桌宠不共用存档。"""
+        if not os.path.isfile(TOWER_HTML):
+            self.say("爬塔还没打包，先在 tower/ 里 npm run release")
+            return
+        self.say("去爬塔啦！")
+        QDesktopServices.openUrl(QUrl.fromLocalFile(TOWER_HTML))
+
     def _build_menu(self):
         m = QMenu(self)
+        m.addAction("🗼 爬塔", self.open_tower)
+        m.addSeparator()
         expr_menu = m.addMenu("做个表情")
         expr_menu.addAction("随机", self.play_random)
         expr_menu.addSeparator()
