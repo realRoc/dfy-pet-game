@@ -4,7 +4,6 @@
 - macOS 适配：鼠标穿透改用 Qt 自带标志，开机自启用 LaunchAgent，字体按平台选
 - 新增「做个表情」「喂食」「说句话」「设置城市」菜单和表情动作（expressions.py）
 - 新增 dsh-pet 的动作动画（舞狮、玩玩具汽车……，clips.py），放进「做个表情」，闲着时也会自己播
-- 新增「打开飞行棋」，和棋盘窗口来回切换
 - 天气查询改到后台线程，不卡界面
 """
 import math
@@ -91,6 +90,7 @@ FOOD_LINES = {
 }
 FOODS = ["🐟", "🍰", "🍭", "🍡", "💎"]
 
+# 自启项的名字沿用飞行棋时期的，已经开过自启的用户关掉时还能删到
 LAUNCH_AGENT = os.path.expanduser("~/Library/LaunchAgents/com.realroc.dafeiyu-board.plist")
 
 
@@ -173,7 +173,7 @@ class ChatDialog(QDialog):
 
 
 class FunctionPanel(QFrame):
-    """单击弹出的功能列表：聊天 / 飞行棋"""
+    """单击弹出的功能列表：聊天"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(float_flags())
@@ -197,7 +197,7 @@ class FunctionPanel(QFrame):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(2)
 
-        for icon, tip, fn in (("🗨️", "聊天", self._on_chat_clicked), ("🎲", "飞行棋", self._on_board_clicked)):
+        for icon, tip, fn in (("🗨️", "聊天", self._on_chat_clicked),):
             b = QPushButton(icon)
             b.setFont(emoji_font(26))
             b.setToolTip(tip)
@@ -205,19 +205,13 @@ class FunctionPanel(QFrame):
             b.clicked.connect(fn)
             layout.addWidget(b)
 
-        self.setFixedSize(124, 60)
+        self.setFixedSize(68, 60)
         self.hide()
 
     def _on_chat_clicked(self):
         self.hide()
         if self.parent():
             self.parent()._show_chat_dialog()
-
-    def _on_board_clicked(self):
-        self.hide()
-        if self.parent():
-            self.parent().chat_paused = False
-            self.parent().app.open_board()
 
     def popup_at(self, x, y):
         self.move(int(x), int(y))
@@ -806,7 +800,6 @@ class PetWindow(QWidget):
 
     def _build_menu(self):
         m = QMenu(self)
-        m.addAction("🎲 打开飞行棋", self.app.open_board)
         expr_menu = m.addMenu("做个表情")
         expr_menu.addAction("随机", self.play_random)
         expr_menu.addSeparator()
@@ -918,11 +911,10 @@ class PetWindow(QWidget):
 
     def set_topmost(self, on):
         self.cfg["topmost"] = bool(on)
-        for w in (self, self.app.board):
-            visible = w.isVisible()
-            w.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, bool(on))
-            if visible:
-                w.show()
+        visible = self.isVisible()
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, bool(on))
+        if visible:
+            self.show()
 
     def set_autostart(self, on):
         self.cfg["autostart"] = bool(on)
