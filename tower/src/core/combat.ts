@@ -53,9 +53,8 @@ export class Combat {
   }
 
   start(): GameEvent[] {
-    for (const id of this.relics) RELICS[id].combatStart?.(this);
     for (const e of this.enemies) this.planIntent(e);
-    this.startPlayerTurn();
+    this.startPlayerTurn(true);
     return this.flush();
   }
 
@@ -253,7 +252,7 @@ export class Combat {
     if (!this.living().length) { this.result = 'victory'; this.emit({t: 'victory'}); }
   }
 
-  private startPlayerTurn() {
+  private startPlayerTurn(first = false) {
     this.turn++;
     this.inPlayerTurn = true;
     this.attacksThisTurn = 0;
@@ -263,6 +262,9 @@ export class Combat {
     if (this.player.block) { this.player.block = 0; this.emit({t: 'blockClear', unit: 'p'}); }
     this.energy = ENERGY_PER_TURN;
     this.emit({t: 'energy', energy: this.energy});
+    // Combat-start relics run after the block reset, so opening block such as
+    // 吃饭的铁盆 lasts through the first enemy turn.
+    if (first) for (const id of this.relics) RELICS[id].combatStart?.(this);
     for (const id of this.relics) RELICS[id].turnStart?.(this);
     this.draw(HAND_SIZE + (this.player.status.extraDraw ?? 0));
   }

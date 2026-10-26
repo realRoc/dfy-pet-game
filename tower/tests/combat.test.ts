@@ -138,6 +138,17 @@ describe('relics', () => {
     expect(run.cardChoices).toHaveLength(3);
   });
 
+  it('吃饭的铁盆 block lasts through the first enemy turn and clears on the next player turn', () => {
+    const c = setup(Array(20).fill('tailSlap'), ['gull'], ['ironBasin']);
+    c.start();
+    expect(c.player.block).toBe(10);
+    expect(c.enemies[0].moveName).toBe('叼走饭碗'); // opens with a 5 damage hit
+    c.endTurn();
+    expect(c.player.hp).toBe(50);
+    expect(c.turn).toBe(2);
+    expect(c.player.block).toBe(0);
+  });
+
   it('电饭煲 gives 2 energy on turn 3', () => {
     const c = setup(Array(20).fill('ironBowl'), ['dummy'], ['riceCooker']);
     c.start();
