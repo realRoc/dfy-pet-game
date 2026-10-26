@@ -73,7 +73,7 @@ const list: CardDef[] = [
 
   // 铁盆：叠格挡、留格挡，再用格挡砸人
   {id: 'headbutt', name: '铁盆头槌', cost: 1, type: 'attack', rarity: 'common', school: 'basin', target: 'enemy',
-    ops: [{op: 'damage', n: 0, fromBlock: true}], text: '造成等于你当前格挡的伤害（{d}）。', art: 'bowl', flavor: '铛！', up: {cost: 0}},
+    ops: [{op: 'damage', n: 0, fromBlock: true}], text: '造成等于你当前格挡的伤害（{d}）。不吃波峰、力量、虚弱等加成。', art: 'bowl', flavor: '铛！', up: {cost: 0}},
   {id: 'clang', name: '铛！', cost: 1, type: 'skill', rarity: 'common', school: 'basin', target: 'self',
     ops: [{op: 'block', n: 8}, {op: 'draw', n: 1}], text: '获得 8 点格挡。抽 1 张牌。', art: 'bowl',
     up: {ops: [{op: 'block', n: 11}, {op: 'draw', n: 1}], text: '获得 11 点格挡。抽 1 张牌。'}},

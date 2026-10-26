@@ -42,6 +42,8 @@ export class Combat {
   private nextUid = 1;
   private events: GameEvent[] = [];
   private inPlayerTurn = false;
+  /** Debuffs enemies put on the player this round; they skip the round-end tick so they last through the player's next turn. */
+  private freshDebuffs = new Set<StatusId>();
 
   constructor(setup: CombatSetup) {
     this.rng = new Rng(setup.seed);
@@ -153,9 +155,12 @@ export class Combat {
       if (CARDS[c.id].ethereal) this.exhaust(c, 'ethereal');
       else this.moveTo(c, 'discard', 'discard');
     }
-    this.tickDown(this.player);
     this.enemyPhase();
-    if (!this.result) this.startPlayerTurn();
+    if (this.result) return this.flush();
+    // Weak / vulnerable wear off at the end of the round, after the enemies have hit.
+    this.tickDown(p, this.freshDebuffs);
+    this.freshDebuffs.clear();
+    this.startPlayerTurn();
     return this.flush();
   }
 
@@ -179,7 +184,7 @@ export class Combat {
         this.emit({t: 'shuffle', drawCount: this.piles.draw.length});
       }
       const card = this.piles.draw.pop()!;
-      if (this.piles.hand.length >= MAX_HAND) { this.moveTo(card, 'discard', 'discard'); continue; }
+      if (this.piles.hand.length >= MAX_HAND) { this.moveTo(card, 'discard', 'burned'); continue; }
       this.piles.hand.push(card);
       this.emit({t: 'draw', card, drawCount: this.piles.draw.length, discardCount: this.piles.discard.length});
     }
@@ -220,6 +225,7 @@ export class Combat {
   }
 
   applyStatus(u: Unit, status: StatusId, n: number) {
+    if (u === this.player && !this.inPlayerTurn && n > 0) this.freshDebuffs.add(status);
     u.status[status] = (u.status[status] ?? 0) + n;
     this.emit({t: 'status', unit: u.id, status, amount: n, value: u.status[status]!});
   }
@@ -378,9 +384,9 @@ export class Combat {
     this.emit({t: 'intent', unit: e.id, intent: e.intent, move: e.moveName});
   }
 
-  private tickDown(u: Unit) {
+  private tickDown(u: Unit, skip?: Set<StatusId>) {
     for (const s of ['weak', 'vulnerable'] as const) {
-      if (u.status[s]) this.applyStatus(u, s, -1);
+      if (u.status[s] && !skip?.has(s)) this.applyStatus(u, s, -1);
       if (u.status[s] === 0) delete u.status[s];
     }
   }

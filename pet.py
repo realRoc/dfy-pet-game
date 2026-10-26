@@ -808,8 +808,12 @@ class PetWindow(QWidget):
         if not os.path.isfile(TOWER_HTML):
             self.say("爬塔还没打包，先在 tower/ 里 npm run release")
             return
-        self.say("去爬塔啦！")
-        QDesktopServices.openUrl(QUrl.fromLocalFile(TOWER_HTML))
+        # 交不给系统浏览器时 openUrl 返回 False（比如没有关联 .html 的程序），这时别报“去爬塔啦”
+        if QDesktopServices.openUrl(QUrl.fromLocalFile(TOWER_HTML)):
+            self.say("去爬塔啦！")
+        else:
+            print("爬塔打开失败:", TOWER_HTML)
+            self.say("浏览器没打开，手动打开 content/tower/index.html")
 
     def _build_menu(self):
         m = QMenu(self)

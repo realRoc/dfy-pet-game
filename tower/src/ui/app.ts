@@ -373,6 +373,7 @@ export class App {
           if (inHand) { this.flyCard(e.card.uid, e.pile === 'exhaust' ? 'exhaust' : 'discard'); v.hand = v.hand.filter(c => c.uid !== e.card.uid); this.renderHand(); }
           if (e.pile === 'discard') v.discardCount++;
           if (e.pile === 'draw') v.drawCount++;
+          if (e.reason === 'burned') { v.drawCount--; this.toast('p', `手牌满了，${CARDS[e.card.id].name} 进了弃牌堆`); }
           if (e.pile === 'exhaust') v.exhaustCount++;
           this.renderBottom();
           if (e.reason === 'created' && e.pile === 'discard') this.pulse('discard');

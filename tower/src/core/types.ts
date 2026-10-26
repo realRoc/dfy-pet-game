@@ -101,7 +101,7 @@ export type GameEvent =
   | {t: 'draw'; card: Card; drawCount: number; discardCount: number}
   | {t: 'shuffle'; drawCount: number}
   | {t: 'play'; card: Card; target?: string; energy: number}
-  | {t: 'cardTo'; card: Card; pile: Pile; reason?: 'exhaust' | 'discard' | 'played' | 'ethereal' | 'created'}
+  | {t: 'cardTo'; card: Card; pile: Pile; reason?: 'exhaust' | 'discard' | 'played' | 'ethereal' | 'created' | 'burned'} // burned: drawn into a full hand
   | {t: 'damage'; src: string; dst: string; amount: number; blocked: number; hp: number; block: number; hit: number; hits: number}
   | {t: 'block'; unit: string; amount: number; block: number}
   | {t: 'blockClear'; unit: string}

@@ -65,6 +65,9 @@ export function cardText(def: CardDef, dmg: number | null): string {
   if (base && base.op === 'damage' && dmg !== null) {
     const cls = dmg > base.n ? 'up' : dmg < base.n ? 'down' : '';
     html = html.replace('{d}', `<b class="${cls}">${dmg}</b>`);
+  } else if (base && base.op === 'damage') {
+    // No number outside a fight for 铁盆头槌 (it depends on your block), so drop the placeholder.
+    html = html.replace('（{d}）', '').replace('{d}', String(base.n));
   }
   return html;
 }

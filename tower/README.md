@@ -21,7 +21,7 @@ npm run release    # build 之后复制到 ../content/tower/，给桌宠用（�
 桌宠单击弹出的面板里有 🗼，右键菜单第一项是「🗼 爬塔」，都会用系统浏览器打开 `content/tower/index.html`。
 
 - 桌宠用户不一定装了 node，`dist/` 又被 gitignore 了，所以打包好的单文件网页提交在仓库根目录的 `content/tower/index.html`（约 500 KB，图片都内联成 data URI）。
-- **改了 `tower/` 的代码之后要跑一次 `npm run release` 再提交 `content/tower/`。** 它顺带写一份 `content/tower/SOURCE_HASH`（源码的哈希），根目录的 `python -m unittest discover -s tests` 会比对它，忘了重新打包测试就会失败。
+- **改了 `tower/` 的代码之后要跑一次 `npm run release` 再提交 `content/tower/`。** 它顺带写一份 `content/tower/SOURCE_HASH`（源码的哈希），根目录的 `python -m unittest discover -s tests` 会比对它，忘了重新打包测试就会失败；CI 还会重新打包一次，确认提交的 `content/tower/` 和源码、`package-lock.json` 打出来的一字不差。
 - 为什么用系统浏览器：桌宠依赖的是 `PySide6-Essentials`，不带 QtWebEngine；为一个网页游戏多装几百 MB 的浏览器内核不划算，而且游戏本来就是给浏览器写的。
 
 ## 怎么玩

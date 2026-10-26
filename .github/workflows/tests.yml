@@ -24,7 +24,7 @@ jobs:
       - run: python -c "import clips; assert clips.AVAILABLE"
       - run: python -m unittest discover -s tests -v
 
-  # 爬塔的规则测试（vitest）和类型检查 + 打包；content/tower 是否过期由上面的 Python 测试按源码哈希检查
+  # 爬塔的规则测试（vitest）、类型检查 + 打包，再确认提交的 content/tower 和现在的源码、锁定依赖打出来的一字不差
   tower:
     runs-on: ubuntu-latest
     defaults:
@@ -39,4 +39,10 @@ jobs:
           cache-dependency-path: tower/package-lock.json
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - run: npm run release
+      - name: content/tower 是最新打包
+        run: |
+          git diff --stat --exit-code -- ../content/tower || {
+            echo "::error::content/tower 和源码打出来的不一致：在 tower/ 里跑 npm run release 再提交 content/tower/"
+            exit 1
+          }

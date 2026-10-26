@@ -38,7 +38,7 @@ else:
 
 def source_hash():
     """和 tower/tools/release.mjs 的 sourceHash() 同一个算法：路径排序、跳过点文件、换行统一成 LF。"""
-    files = ["index.html", "package.json", "vite.config.ts"]
+    files = ["index.html", "package.json", "package-lock.json", "tsconfig.json", "vite.config.ts"]
     for dirpath, dirnames, names in os.walk(os.path.join(TOWER_SRC, "src")):
         dirnames[:] = [d for d in dirnames if not d.startswith(".")]
         for name in names:
@@ -100,6 +100,7 @@ class TowerEntryTest(unittest.TestCase):
         url = self.catcher.urls[0]
         self.assertTrue(url.isLocalFile())
         self.assertEqual(os.path.normpath(url.toLocalFile()), os.path.normpath(common.TOWER_HTML))
+        self.assertEqual(self.app.pet.bubble_text, "去爬塔啦！")
 
     def test_click_panel_opens_tower(self):
         pet_w = self.app.pet
@@ -119,6 +120,14 @@ class TowerEntryTest(unittest.TestCase):
             self.app.pet.open_tower()
         self.assertEqual(self.catcher.urls, [])
         self.assertIn("npm run release", self.app.pet.bubble_text)
+
+    def test_browser_refusing_says_so_instead_of_cheering(self):
+        with mock.patch.object(pet, "QDesktopServices") as ds:
+            ds.openUrl.return_value = False
+            self.app.pet.open_tower()
+        ds.openUrl.assert_called_once()
+        self.assertNotIn("去爬塔啦", self.app.pet.bubble_text)
+        self.assertIn("content/tower/index.html", self.app.pet.bubble_text)
 
 
 if __name__ == "__main__":

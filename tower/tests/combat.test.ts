@@ -2,7 +2,7 @@ import {describe, expect, it} from 'vitest';
 import {Combat, MAX_HAND} from '../src/core/combat';
 import {Run} from '../src/core/run';
 import {CARDS} from '../src/content/cards';
-import type {GameEvent} from '../src/core/types';
+import type {GameEvent, Intent} from '../src/core/types';
 
 const setup = (deck: string[], enemies = ['dummy'], relics: string[] = []) =>
   new Combat({deck, hp: 50, maxHp: 50, relics, enemies, seed: 7});
@@ -66,6 +66,55 @@ describe('combat basics', () => {
     const events = c.play(c.piles.hand[0].uid);
     expect(c.result).toBe('victory');
     expect(events.filter(e => e.t === 'death')).toHaveLength(2);
+  });
+});
+
+describe('手牌上限', () => {
+  it('满手时抽到的牌标成 burned 进弃牌堆，界面靠它把抽牌堆数字减掉', () => {
+    const c = setup(Array(15).fill('tailSlap'));
+    c.start();
+    while (c.piles.hand.length < MAX_HAND) c.piles.hand.push(c.piles.draw.pop()!);
+    const before = c.piles.draw.length;
+    c.draw(1);
+    const events = c['flush'](); // draw() is public, but its events normally leave through play()
+    expect(c.piles.draw.length).toBe(before - 1);
+    expect(events).toContainEqual(expect.objectContaining({t: 'cardTo', pile: 'discard', reason: 'burned'}));
+  });
+});
+
+describe('虚弱 / 易伤', () => {
+  // Each endTurn runs the enemy's current intent, then plans a new one; tests overwrite it to script the fight.
+  const script = (c: Combat, intent: Intent) => { c.enemies[0].intent = intent; };
+
+  it('敌人给的易伤 2 撑到它下一次攻击，意图上的数字就是实际伤害', () => {
+    const c = setup(Array(10).fill('ironBowl'));
+    c.start();
+    script(c, {kind: 'debuff', status: 'vulnerable', n: 2});
+    c.endTurn();
+    expect(c.player.status.vulnerable).toBe(2);
+    script(c, {kind: 'idle'});
+    c.endTurn();
+    expect(c.player.status.vulnerable).toBe(1);
+    script(c, {kind: 'attack', dmg: 10, times: 1});
+    const shown = c.intentDamage(c.enemies[0]);
+    expect(shown).toBe(15);
+    const hp = c.player.hp;
+    c.endTurn();
+    expect(hp - c.player.hp).toBe(shown);
+    expect(c.player.status.vulnerable).toBeUndefined();
+  });
+
+  it('敌人给的虚弱 1 正好管玩家一个回合', () => {
+    const c = setup(Array(10).fill('tailSlap'));
+    c.start();
+    const full = c.cardDamage(CARDS.tailSlap);
+    script(c, {kind: 'attackDebuff', dmg: 1, times: 1, status: 'weak', n: 1});
+    c.endTurn();
+    expect(c.cardDamage(CARDS.tailSlap)).toBeLessThan(full!);
+    script(c, {kind: 'idle'});
+    c.endTurn();
+    expect(c.player.status.weak).toBeUndefined();
+    expect(c.cardDamage(CARDS.tailSlap)).toBe(full);
   });
 });
 

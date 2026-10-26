@@ -15,7 +15,7 @@ const out = path.join(tower, '../content/tower');
 
 /** Same recipe as source_hash() in tests/test_tower.py: sorted posix paths, no dotfiles, LF line endings. */
 export function sourceHash() {
-  const files = ['index.html', 'package.json', 'vite.config.ts'];
+  const files = ['index.html', 'package.json', 'package-lock.json', 'tsconfig.json', 'vite.config.ts'];
   const walk = dir => {
     for (const name of fs.readdirSync(path.join(tower, dir))) {
       if (name.startsWith('.')) continue; // .DS_Store and friends aren't in git
