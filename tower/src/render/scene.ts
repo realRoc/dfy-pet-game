@@ -83,6 +83,8 @@ export class Scene {
   thinking: {at: number} | null = null;
   basin: {at: number} | null = null;
   overhead: {name: string; at: number} | null = null;
+  /** 波峰 / 波谷 aura around the hero; set by the HUD as stance events play. */
+  stance: 'none' | 'crest' | 'trough' = 'none';
   private hero$!: Atlas;
   private close$!: Atlas;
   private whale!: HTMLCanvasElement;
@@ -120,11 +122,14 @@ export class Scene {
       const art = enemyArt(e.kind);
       return {id: e.id, kind: e.kind, x: slots[i], pose: 'idle', flashUntil: 0, dyingAt: null, w: art.w, h: art.h, hover: art.hover};
     });
-    this.hero.x = HERO_X; this.hero.pose = 'idle'; this.hero.hidden = false;
+    this.hero.x = HERO_X; this.hero.pose = 'idle'; this.hero.hidden = false; this.stance = 'none';
     this.floaters = []; this.particles = []; this.projectiles = [];
   }
 
   actor(id: string) { return this.actors.find(a => a.id === id)!; }
+
+  /** The small whale sprite, for the map marker. */
+  get whaleIcon() { return this.whaleSmall; }
 
   /** One battle pose as its own canvas, for card illustrations. */
   heroFrame(name: string) { return cut(this.hero$, name); }
@@ -396,8 +401,8 @@ export class Scene {
     const sink = a.dyingAt ? (time - a.dyingAt) / 500 * 8 : 0;
     const x = Math.round(a.x - sprite.width / 2), y = Math.round(GROUND - a.hover - sprite.height + 1 + bob + sink);
     ctx.globalAlpha = a.dyingAt ? 1 - (time - a.dyingAt) / 500 : 1;
-    // 服务器繁忙: the jellyfish tears into offset slices now and then.
-    const glitch = a.kind === 'jelly' && time % 2300 < 150;
+    // 服务器繁忙 tears into offset slices now and then; 乱码虫 does it all the time.
+    const glitch = (a.kind === 'jelly' && time % 2300 < 150) || (a.kind === 'glitch' && time % 700 < 220) || (a.kind === 'blackWhale' && time % 3100 < 90);
     if (glitch) {
       for (let y0 = 0; y0 < sprite.height; y0 += 4) {
         const dx = Math.round((noise(y0 + Math.floor(time / 50)) - .5) * 8);
@@ -417,6 +422,20 @@ export class Scene {
 
   private drawHeroExtras() {
     const {p, time, ctx} = this;
+    if (this.stance === 'crest' && !this.hero.hidden) {
+      // 波峰: a crest of spray rising off the hero.
+      for (let i = 0; i < 14; i++) {
+        const k = (time / 500 + noise(i)) % 1, x = this.hero.x - 22 + noise(i * 3) * 44, y = GROUND - 4 - k * 70;
+        p.rect(x, y, 2, 3 - Math.floor(k * 2), k < .5 ? '#ffb46b' : '#ff7a5c');
+      }
+      p.ring(this.hero.x, GROUND, 24 + Math.sin(time / 120) * 2, 5, '#ff8a5c', .8);
+    } else if (this.stance === 'trough' && !this.hero.hidden) {
+      // 波谷: slow ripples spreading at her feet.
+      for (let i = 0; i < 3; i++) {
+        const k = (time / 1400 + i / 3) % 1;
+        p.ring(this.hero.x, GROUND + 1, 10 + k * 26, 2 + k * 4, '#8ddde8', 1 - k);
+      }
+    }
     if (this.thinking) {
       const dt = time - this.thinking.at;
       if (dt > 620) this.thinking = null;

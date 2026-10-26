@@ -14,6 +14,8 @@ else:
     APP_DIR = os.path.dirname(os.path.abspath(__file__))
     BUNDLE_DIR = APP_DIR
 SPRITE_DIR = os.path.join(BUNDLE_DIR, "sprites")
+# 爬塔的单文件网页（tower/ 里 npm run release 生成），桌宠用系统浏览器打开它
+TOWER_HTML = os.path.join(BUNDLE_DIR, "content", "tower", "index.html")
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
 
 IS_MAC = sys.platform == "darwin"

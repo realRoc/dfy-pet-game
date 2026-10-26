@@ -1,21 +1,50 @@
-import {CARDS} from '../content/cards';
-import {GAUNTLET} from '../content/enemies';
+import {CARDS, canUpgrade, KEYWORDS, upgradeOf} from '../content/cards';
+import {ENEMIES} from '../content/enemies';
+import {EVENT_BY_ID} from '../content/events';
 import {RELICS} from '../content/relics';
 import type {Combat} from '../core/combat';
-import {Run} from '../core/run';
-import type {Card, EnemyUnit, GameEvent, Intent, StatusId} from '../core/types';
-import {iconUrl} from '../render/icons';
+import {COLS, FLOORS, mapEdges, type RoomType} from '../core/map';
+import {BOSS_NODE, Run} from '../core/run';
+import type {Card, EnemyUnit, GameEvent, Intent, Stance, StatusId} from '../core/types';
+import {icon, iconUrl} from '../render/icons';
+import {noise, painter} from '../render/pixel';
 import {GROUND, Scene, type Actor} from '../render/scene';
 import {cardElement, keywordTips} from './cards';
 import {play as sfx, sound} from './sound';
 
 const S = 3; // CSS pixels per canvas pixel; the stage is 1152×648 before fitting the window
 const STAGE_W = 1152, STAGE_H = 648;
-const STATUS: Record<StatusId, {name: string; char: string; tip: string; good: boolean}> = {
+const STATUS: Record<StatusId, {name: string; char: string; tip: string; good: boolean; hidden?: boolean; flag?: boolean}> = {
   strength: {name: '力量', char: '力', tip: '每段攻击伤害 +{n}。', good: true},
   weak: {name: '虚弱', char: '弱', tip: '造成的攻击伤害 -25%，还剩 {n} 回合。', good: false},
   vulnerable: {name: '易伤', char: '伤', tip: '受到的攻击伤害 +50%，还剩 {n} 回合。', good: false},
   extraDraw: {name: '白饭管够', char: '饭', tip: '每回合开始时多抽 {n} 张牌。', good: true},
+  strengthPerTurn: {name: '尾鳍模式', char: '尾', tip: '每回合开始时获得 {n} 点力量。', good: true},
+  think: {name: '思考', char: '思', tip: '已思考 {n} 秒。', good: true, hidden: true},
+  thinkPerTurn: {name: '开启深度思考', char: '思', tip: '每回合开始时思考 {n} 秒。', good: true},
+  fullSize: {name: '满血版', char: '满', tip: '思考完毕给的巨鲸破浪是升级版，并且本回合 0 费。', good: true, flag: true},
+  keepBlock: {name: '饭盆不离身', char: '盆', tip: '格挡不会在回合开始时清空。', good: true, flag: true},
+  blockPerTurn: {name: '先养着吧', char: '养', tip: '回合结束时获得 {n} 点格挡。', good: true},
+  guard: {name: '护食', char: '护', tip: '这一轮每被攻击一次，反击 {n} 点伤害。', good: true},
+  crestDraw: {name: '傲娇', char: '娇', tip: '每次进入波峰，抽 {n} 张牌。', good: true},
+  switchBlock: {name: '不对，容我再想想', char: '想', tip: '每次切换状态，获得 {n} 点格挡。', good: true},
+  troughBlock: {name: '聪明但懒', char: '懒', tip: '回合结束时若在波谷，获得 {n} 点格挡。', good: true},
+  drawNext: {name: '下周见', char: '周', tip: '下回合多抽 {n} 张牌。', good: true},
+};
+const STANCE: Record<Stance, {name: string; short: string; tip: string}> = {
+  none: {name: '海平面', short: '', tip: ''},
+  crest: {name: '波峰', short: '伤害 ×2', tip: `<p><b>波峰</b></p><p>${KEYWORDS.波峰}</p><p class='flavor'>敌人打算攻击时记得先离开波峰。</p>`},
+  trough: {name: '波谷', short: '离开 +2 算力', tip: `<p><b>波谷</b></p><p>${KEYWORDS.波谷}</p>`},
+};
+export const ROOM: Record<RoomType, {name: string; tip: string}> = {
+  monster: {name: '普通战斗', tip: '打一场，赢了拿 Token 和一张牌。'},
+  elite: {name: '精英', tip: '更难的战斗，赢了额外拿一件遗物。'},
+  event: {name: '问号', tip: '多半是事件，也可能是战斗、商店或宝箱。每次没遇到战斗，下次遇到的几率就更高。'},
+  shop: {name: '商店', tip: '用 Token 买牌、买遗物、删牌。'},
+  rest: {name: '打盹点', tip: '睡一觉回血，或者想一想升级一张牌。'},
+  chest: {name: '宝箱', tip: '一件遗物和一些 Token。'},
+  bug: {name: 'Bug 房', tip: '修 bug、利用 bug，或者当没看见。'},
+  boss: {name: '关底 Boss', tip: '黑鲸 · 更强的Agent。'},
 };
 
 interface UnitView { hp: number; maxHp: number; block: number; status: Partial<Record<StatusId, number>>; alive: boolean; intent?: Intent; move?: string }
@@ -27,8 +56,12 @@ interface View {
   discardCount: number;
   exhaustCount: number;
   attacks: number;
-  exhausted: number;
+  think: number;
+  thinkLimit: number;
+  stance: Stance;
 }
+
+const MAP_COL = 26, MAP_ROW = 22, MAP_TOP = 34, MAP_W = 16 + COLS * MAP_COL, MAP_H = MAP_TOP + FLOORS * MAP_ROW + 8, MAP_S = 3;
 
 type Anim = 'tail' | 'spin' | 'think' | 'bowl' | 'ponder' | 'smug' | 'cutin';
 
@@ -60,7 +93,8 @@ export class App {
     this.bindInput();
   }
 
-  get combat(): Combat { return this.run.combat; }
+  get combat(): Combat { return this.run.combat!; }
+  private get fighting() { return !!this.run?.combat && this.run.stage === 'combat' && !!this.view; }
 
   async boot() {
     await this.scene.load();
@@ -84,7 +118,38 @@ export class App {
 
   newRun(seed = Math.floor(Math.random() * 2 ** 31)) {
     this.run = new Run(seed);
-    this.startCombat();
+    this.enterStage();
+  }
+
+  /** Shows whatever the run is waiting on. */
+  private enterStage() {
+    const run = this.run;
+    if (run.stage !== 'combat') this.clearBattle();
+    switch (run.stage) {
+      case 'map': return this.mapScreen();
+      case 'combat': return this.startCombat();
+      case 'reward': return this.rewardScreen();
+      case 'event': return this.eventScreen();
+      case 'shop': return this.shopScreen();
+      case 'rest': return this.restScreen();
+      case 'chest': return this.chestScreen();
+      case 'bug': return this.bugScreen();
+      case 'cleared': return this.endScreen(true);
+      case 'dead': return this.endScreen(false);
+    }
+  }
+
+  /** Back to whatever was showing under a deck or map peek. */
+  private restoreScreen() { if (this.run.stage === 'combat') this.closeOverlay(); else this.enterStage(); }
+
+  /** Empty beach with the hero standing on it, behind the room screens. */
+  private clearBattle() {
+    this.scene.setEnemies([]);
+    this.view = null!;
+    this.selected = null; this.choosing = null;
+    this.layer('prompt').hidden = true;
+    for (const id of ['units', 'hand', 'bottom']) this.layer(id).replaceChildren();
+    this.renderTop();
   }
 
   private startCombat() {
@@ -92,13 +157,14 @@ export class App {
     this.scene.setEnemies(c.enemies);
     this.view = {
       units: Object.fromEntries([c.player, ...c.enemies].map(u => [u.id, {hp: u.hp, maxHp: u.maxHp, block: 0, status: {}, alive: true}])),
-      hand: [], energy: 0, drawCount: c.piles.draw.length, discardCount: 0, exhaustCount: 0, attacks: 0, exhausted: 0,
+      hand: [], energy: 0, drawCount: c.piles.draw.length, discardCount: 0, exhaustCount: 0, attacks: 0, think: 0, thinkLimit: c.thinkLimit, stance: 'none',
     };
     this.selected = null; this.choosing = null;
     this.closeOverlay();
     this.buildUnits();
     this.renderAll();
-    this.banner(this.run.encounter.name, this.run.encounter.elite ? 'elite' : '');
+    const enc = this.run.encounter!;
+    this.banner(enc.name, enc.boss ? 'boss' : enc.elite ? 'elite' : '');
     void this.playBatch(c.start());
   }
 
@@ -114,9 +180,7 @@ export class App {
     setTimeout(() => {
       // 重开 is clickable during this pause; a new run must not get the old one's screen.
       if (this.run !== run || run.combat !== combat) return;
-      if (run.stage === 'reward') this.rewardScreen();
-      else if (run.stage === 'cleared') this.endScreen(true);
-      else this.endScreen(false);
+      this.enterStage();
     }, won ? 900 : 1200);
   }
 
@@ -124,7 +188,7 @@ export class App {
 
   private bindInput() {
     addEventListener('keydown', e => {
-      if (!this.run || this.layer('overlay').childElementCount) return;
+      if (!this.fighting || this.layer('overlay').childElementCount) return;
       if (e.key === 'e' || e.key === 'E') this.endTurn();
       else if (e.key === 'Escape') { this.selected = null; this.renderHand(); this.renderUnits(); }
       else if (/^[0-9]$/.test(e.key)) {
@@ -134,7 +198,7 @@ export class App {
     });
     addEventListener('pointermove', e => this.dragMove(e));
     addEventListener('pointerup', e => this.dragEnd(e));
-    this.stage.addEventListener('contextmenu', e => { e.preventDefault(); this.selected = null; this.renderHand(); this.renderUnits(); });
+    this.stage.addEventListener('contextmenu', e => { e.preventDefault(); if (!this.fighting) return; this.selected = null; this.renderHand(); this.renderUnits(); });
     this.stage.addEventListener('click', () => { if (this.scene.inCutIn) this.scene.skipCutIn(); });
     this.bindTips();
   }
@@ -193,13 +257,13 @@ export class App {
   }
 
   private endTurn() {
-    if (this.busy || this.choosing || !this.run || this.combat.result) return;
+    if (this.busy || this.choosing || !this.fighting || this.combat.result) return;
     this.selected = null;
     void this.playBatch(this.combat.endTurn());
   }
 
   private dragStart(e: PointerEvent, uid: number, card: HTMLElement) {
-    if (this.busy || e.button !== 0) return;
+    if (this.busy || e.button !== 0 || !this.fighting) return;
     const p = this.local(e);
     this.drag = {uid, x0: p.x, y0: p.y, moved: false, el: card};
   }
@@ -221,6 +285,7 @@ export class App {
     const d = this.drag;
     if (!d) return;
     this.drag = null;
+    if (!this.fighting) return;
     if (!d.moved) { this.cardClicked(d.uid); return; }
     const p = this.local(e);
     d.el.classList.remove('dragging'); d.el.style.transform = '';
@@ -253,6 +318,11 @@ export class App {
     const v = this.view;
 
     for (let i = 0; i < events.length; i++) {
+      // A new run or room replaced this fight while it was animating.
+      if (this.view !== v) {
+        if (!this.view) { this.busy = false; this.stage.classList.remove('busy'); }
+        return;
+      }
       const e = events[i];
       switch (e.t) {
         case 'turnStart':
@@ -283,6 +353,7 @@ export class App {
           if (anim === 'cutin') {
             const first = events.slice(i + 1).find(x => x.t === 'damage' && x.src === 'p');
             this.stage.classList.add('cutin');
+            this.layer('tip').hidden = true;
             sfx('think', 0); setTimeout(() => sfx('think', 1), 150); setTimeout(() => sfx('think', 2), 300);
             setTimeout(() => sfx('heavy'), 1840 / this.scene.speed);
             await this.scene.cutIn(first && first.t === 'damage' ? first.amount + first.blocked : 0, target, def.name);
@@ -302,6 +373,7 @@ export class App {
           if (inHand) { this.flyCard(e.card.uid, e.pile === 'exhaust' ? 'exhaust' : 'discard'); v.hand = v.hand.filter(c => c.uid !== e.card.uid); this.renderHand(); }
           if (e.pile === 'discard') v.discardCount++;
           if (e.pile === 'draw') v.drawCount++;
+          if (e.reason === 'burned') { v.drawCount--; this.toast('p', `手牌满了，${CARDS[e.card.id].name} 进了弃牌堆`); }
           if (e.pile === 'exhaust') v.exhaustCount++;
           this.renderBottom();
           if (e.reason === 'created' && e.pile === 'discard') this.pulse('discard');
@@ -339,11 +411,37 @@ export class App {
           const u = v.units[e.unit];
           u.status[e.status] = e.value;
           if (!e.value) delete u.status[e.status];
-          if (e.amount > 0) { this.toast(e.unit, `${STATUS[e.status].name} +${e.amount}`, STATUS[e.status].good ? 'good' : 'bad'); await this.scene.wait(120); }
+          if (e.status === 'think') { v.think = e.value; this.renderBubbles(); if (e.amount > 0) this.toast('p', `思考 +${e.amount} 秒`, 'think'); }
+          else if (e.amount > 0) { this.toast(e.unit, `${STATUS[e.status].name} +${e.amount}`, STATUS[e.status].good ? 'good' : 'bad'); await this.scene.wait(120); }
           this.renderUnits();
           break;
         }
         case 'heal': v.units[e.unit].hp = e.hp; this.scene.healFx(e.amount); this.renderUnits(); break;
+        case 'hpLoss':
+          v.units[e.unit].hp = e.hp;
+          sfx('hurt');
+          this.toast('p', `${e.why}：失去 ${e.amount} 点生命`, 'bad');
+          await this.scene.heroHurt(e.amount, 0);
+          this.renderUnits(); this.renderTop();
+          break;
+        case 'stance': {
+          v.stance = e.stance;
+          this.scene.stance = e.stance;
+          const s = STANCE[e.stance];
+          this.toast('p', e.stance === 'none' ? '回到海平面' : `进入${s.name}：${s.short}`, e.stance === 'crest' ? 'bad' : 'good');
+          if (e.from === 'trough') this.toast('energy', '离开波谷 +2 算力', 'good');
+          this.scene.flash(e.stance === 'crest' ? '#ff8a5c' : '#8ddde8', 120);
+          sfx(e.stance === 'crest' ? 'swing' : 'think', 2);
+          this.renderBubbles();
+          await this.scene.wait(240);
+          break;
+        }
+        case 'thinkDone':
+          await finishCard();
+          [0, 1, 2].forEach(k => setTimeout(() => sfx('think', k + 1), k * 110 / this.scene.speed));
+          this.banner(`思考完毕（用时 ${v.thinkLimit} 秒）`, 'think');
+          await this.scene.ponder();
+          break;
         case 'death':
           v.units[e.unit].alive = false;
           this.scene.kill(this.scene.actor(e.unit));
@@ -364,7 +462,7 @@ export class App {
           break;
         }
         case 'intent': v.units[e.unit].intent = e.intent; v.units[e.unit].move = e.move; this.renderUnits(); break;
-        case 'counters': v.attacks = e.attacks; v.exhausted = e.exhausted; this.renderBubbles(); break;
+        case 'counters': v.attacks = e.attacks; v.think = e.think; v.thinkLimit = e.thinkLimit; this.renderBubbles(); break;
         case 'relic': {
           const r = RELICS[e.id];
           this.toast('p', `${r.name}${e.note ? '：' + e.note : ''}`, 'good');
@@ -405,12 +503,17 @@ export class App {
   private renderAll() { this.renderTop(); this.renderUnits(); this.renderHand(); this.renderBottom(); this.renderBubbles(); }
 
   private renderTop() {
-    const run = this.run, top = this.layer('top'), p = this.view.units.p;
+    const run = this.run, top = this.layer('top');
+    if (!run) { top.replaceChildren(); return; }
+    const p = this.fighting ? this.view.units.p : {hp: run.hp, maxHp: run.maxHp};
+    const floor = run.pos ? (run.pos.floor >= FLOORS ? '关底' : `第 ${run.pos.floor + 1} 层`) : '塔下';
+    const room = run.stage === 'combat' ? run.encounter!.name : run.room ? ROOM[run.question ?? run.room].name : '选一条路';
     top.innerHTML = `
-      <div class="who"><b>大肥鱼</b><span class="hp">♥ ${p.hp}/${p.maxHp}</span></div>
-      <div class="where">第 ${run.floor + 1}/${GAUNTLET.length} 战 · ${run.encounter.name}</div>
+      <div class="who"><b>大肥鱼</b><span class="hp">♥ ${p.hp}/${p.maxHp}</span><span class="gold" data-tip="<p><b>Token</b></p><p>这座塔里的货币：打怪、开宝箱、事件都能拿到，在商店花掉。和桌宠互不相通。</p>"><img src="${iconUrl('token')}">${run.gold}</span></div>
+      <div class="where">${floor} · ${room}</div>
       <div class="relics"></div>
       <div class="tools">
+        <button data-act="map">地图</button>
         <button data-act="deck">牌组 ${run.deck.length}</button>
         <button data-act="speed">${this.scene.speed}×</button>
         <button data-act="sound">${sound.enabled ? '音效 开' : '音效 关'}</button>
@@ -424,6 +527,7 @@ export class App {
       relics.append(img);
     }
     top.querySelector('[data-act=deck]')!.addEventListener('click', () => this.pileScreen('牌组', run.deck.map((id, uid) => ({uid, id}))));
+    top.querySelector('[data-act=map]')!.addEventListener('click', () => { if (run.stage !== 'map') this.mapScreen(true); });
     top.querySelector('[data-act=speed]')!.addEventListener('click', () => { this.scene.speed = this.scene.speed === 1 ? 2 : 1; this.renderTop(); });
     top.querySelector('[data-act=sound]')!.addEventListener('click', () => { sound.enabled = !sound.enabled; this.renderTop(); });
     top.querySelector('[data-act=restart]')!.addEventListener('click', () => { if (!this.busy) this.newRun(); });
@@ -444,7 +548,8 @@ export class App {
         <div class="statuses" style="top:${(GROUND + 5) * S - 30}px;left:${-barW / 2}px"></div>`;
       if (id !== 'p') {
         const hit = u.querySelector<HTMLElement>('.hit')!;
-        hit.dataset.tip = `<p><b>${this.combat.unit(id).name}</b></p>`;
+        const e = this.combat.enemies.find(x => x.id === id)!, note = ENEMIES[e.kind].note;
+        hit.dataset.tip = `<p><b>${e.name}</b></p>${note ? `<p class="flavor">${note}</p>` : ''}`;
         hit.addEventListener('click', () => { if (this.selected !== null) this.tryPlay(this.selected, id); });
       }
       box.append(u);
@@ -470,8 +575,8 @@ export class App {
       blk.textContent = s.block ? String(s.block) : '';
       blk.hidden = !s.block;
       u.querySelector('.statuses')!.innerHTML = (Object.entries(s.status) as [StatusId, number][])
-        .filter(([, n]) => n)
-        .map(([k, n]) => `<span class="st ${STATUS[k].good ? 'good' : 'bad'}" data-tip="<p><b>${STATUS[k].name}</b></p><p>${STATUS[k].tip.replace('{n}', String(n))}</p>">${STATUS[k].char}<sub>${n}</sub></span>`).join('');
+        .filter(([k, n]) => n && !STATUS[k].hidden)
+        .map(([k, n]) => `<span class="st ${STATUS[k].good ? 'good' : 'bad'}" data-tip="<p><b>${STATUS[k].name}</b></p><p>${STATUS[k].tip.replace('{n}', String(n))}</p>">${STATUS[k].char}${STATUS[k].flag ? '' : `<sub>${n}</sub>`}</span>`).join('');
       const intent = u.querySelector<HTMLElement>('.intent');
       if (intent) {
         const live = this.combat.enemies.find(e => e.id === id)!;
@@ -489,7 +594,9 @@ export class App {
       case 'attackDefend': tip += `，并获得 ${intent.block} 点格挡`; break;
       case 'attackDebuff': tip += `，并施加 ${intent.n} 层${STATUS[intent.status].name}`; break;
       case 'defend': ico = 'defend'; label = ''; tip = `获得 ${intent.block} 点格挡`; break;
-      case 'buff': ico = 'buff'; label = ''; tip = `获得 ${intent.n} 点${STATUS[intent.status].name}`; break;
+      case 'buff': ico = 'buff'; label = ''; tip = `获得 ${intent.n} 点${STATUS[intent.status].name}${intent.block ? `和 ${intent.block} 点格挡` : ''}`; break;
+      case 'debuff': ico = 'debuff'; label = ''; tip = `给你施加 ${intent.n} 层${STATUS[intent.status].name}`; break;
+      case 'charge': ico = 'charge'; label = '…'; tip = '在憋大招。下回合多半是一记重击，别待在波峰里'; break;
       case 'stuff': ico = 'stuff'; label = `+${intent.n}`; tip = `把 ${intent.n} 张「${CARDS[intent.id].name}」塞进你的弃牌堆，并获得 ${intent.block} 点格挡`; break;
       case 'idle': ico = 'idle'; label = ''; tip = '它在发呆。'; break;
     }
@@ -497,10 +604,15 @@ export class App {
     return `<div data-tip="<p><b>${e.name}打算：${move}</b></p><p>${tip}。</p>"><img src="${iconUrl(ico)}">${extra}<b>${label}</b></div>`;
   }
 
+  /** Over the hero's head: stance, 已思考 N 秒 and 连击, each with a tooltip. */
   private renderBubbles() {
     const v = this.view, b = this.layer('units').querySelector('.bubbles');
-    if (!b) return;
-    b.innerHTML = (v.attacks ? `<span class="combo">连击 ×${v.attacks}</span>` : '') + (v.exhausted ? `<span class="think">已思考 ${v.exhausted} 秒</span>` : '');
+    if (!b || !v) return;
+    const s = STANCE[v.stance];
+    const thinkTip = `<p><b>深度思考</b></p><p>${KEYWORDS.思考}</p><p class='flavor'>还差 ${v.thinkLimit - v.think} 秒。</p>`;
+    b.innerHTML = (v.stance !== 'none' ? `<span class="stance ${v.stance}" data-tip="${s.tip}">${s.name}<small>${s.short}</small></span>` : '')
+      + (v.think ? `<span class="think" data-tip="${thinkTip}">已思考 ${v.think}/${v.thinkLimit} 秒<i style="width:${(v.think / v.thinkLimit) * 100}%"></i></span>` : '')
+      + (v.attacks ? `<span class="combo" data-tip="<p><b>连击</b></p><p>本回合打出的攻击牌数，鲸落按它加伤害。</p>">连击 ×${v.attacks}</span>` : '');
   }
 
   private renderHand(entering?: number) {
@@ -510,7 +622,7 @@ export class App {
     const n = v.hand.length, gap = Math.min(116, n > 1 ? 640 / (n - 1) : 0), mid = (n - 1) / 2;
     v.hand.forEach((card, i) => {
       const def = CARDS[card.id];
-      const node = cardElement(this.scene, card.id, c.cardDamage(def));
+      const node = cardElement(this.scene, card.id, c.cardDamage(def), c.costOf(card));
       node.dataset.uid = String(card.uid);
       node.classList.add('inhand');
       const off = i - mid;
@@ -532,6 +644,7 @@ export class App {
 
   private renderBottom(pulseEnergy = false) {
     const v = this.view, b = this.layer('bottom');
+    if (!v) return;
     b.innerHTML = `
       <div class="energy${pulseEnergy ? ' pop' : ''}" data-tip="<p><b>算力</b></p><p>打牌要花的点数，每回合恢复到 3 点。</p>"><b>${v.energy}</b><span>/3</span><small>算力</small></div>
       <button class="pile draw" data-tip="<p>还没抽到的牌。点开查看（顺序打乱显示）。</p>">抽牌堆<b>${v.drawCount}</b></button>
@@ -567,9 +680,12 @@ export class App {
   }
 
   private toast(unit: string, text: string, tone = '') {
-    const b = this.scene.box(unit), t = el('div', 'toast ' + tone, text);
+    const b = unit === 'energy' ? {x: 24, y: 150, w: 0, h: 0} : this.scene.box(unit), t = el('div', 'toast ' + tone, text);
+    // Toasts that land on the same unit stack upwards instead of overprinting.
+    const stacked = [...this.layer('fx').querySelectorAll<HTMLElement>('.toast')].filter(x => x.dataset.unit === unit).length;
+    t.dataset.unit = unit;
     t.style.left = `${(b.x + b.w / 2) * S}px`;
-    t.style.top = `${(b.y - 4) * S}px`;
+    t.style.top = `${(b.y - 4) * S - stacked * 24}px`;
     this.layer('fx').append(t);
     t.animate([{opacity: 0, translate: '-50% 10px'}, {opacity: 1, translate: '-50% 0', offset: .15}, {opacity: 1, translate: '-50% -18px', offset: .8}, {opacity: 0, translate: '-50% -26px'}], {duration: 1300 / this.scene.speed}).finished.then(() => t.remove());
   }
@@ -599,60 +715,289 @@ export class App {
 
   private titleScreen() {
     const p = this.overlay('title', `
-      <h1>大肥鱼爬塔</h1><p class="sub">战斗原型 · 海边三连战</p>
+      <h1>大肥鱼爬塔</h1><p class="sub">海边的塔 · 15 层 · 顶上住着更强的 Agent</p>
       <ul>
         <li>每回合 <b>3 点算力</b>、抽 <b>5 张牌</b>；敌人头顶显示下回合要做什么。</li>
-        <li><b class="tail">鲸尾</b>：物理连击，本回合打得越多，「鲸落」越疼。</li>
-        <li><b class="think">深度思考</b>：抽牌过牌，本回合消耗的牌越多，「思考完毕」越疼。</li>
-        <li>初始遗物 <b>剩饭</b>：每场战斗结束恢复 6 点生命。</li>
+        <li>地图上选路往上爬：战斗、精英、问号、商店、打盹点、宝箱、Bug 房，第 15 层之上是关底 Boss。</li>
+        <li><b class="tail">鲸尾</b> 连击 · <b class="basin">铁盆</b> 叠格挡砸人 · <b class="wave">波峰波谷</b> 来回切状态 ·
+          <b class="think">深度思考</b> 攒「已思考 N 秒」，满 10 秒巨鲸破浪进手牌。</li>
+        <li>初始遗物 <b>剩饭</b>：每场战斗结束恢复 6 点生命。货币是 <b>Token</b>，和桌宠不通用。</li>
       </ul>
-      <p class="keys">拖牌到敌人身上，或点牌再点敌人 · 数字键选牌 · E 结束回合 · 右键取消</p>
+      <p class="keys">拖牌到敌人身上，或点牌再点敌人 · 数字键选牌 · E 结束回合 · 右键取消 · 鼠标停在任何东西上都有说明</p>
       <button class="go">开饭！</button>`);
     p.querySelector('.go')!.addEventListener('click', () => { sfx('coin'); this.newRun(); });
   }
 
-  private rewardScreen() {
+  // ── map ──────────────────────────────────────────────────────────────────
+
+  private nodeXY(floor: number, col: number): [number, number] {
+    if (floor >= FLOORS) return [Math.round(MAP_W / 2), 16];
+    const seed = this.run.map.seed % 997;
+    return [Math.round(16 + col * MAP_COL + (noise(seed + floor * 13 + col) - .5) * 8),
+      Math.round(MAP_TOP + (FLOORS - 1 - floor) * MAP_ROW + 10 + (noise(seed * 3 + floor * 7 + col * 5) - .5) * 6)];
+  }
+
+  /** The climb, drawn as pixel art; lit nodes are where you can go next. */
+  private mapScreen(peek = false) {
+    const run = this.run, choices = peek ? [] : run.choices();
+    const floorText = run.pos ? (run.pos.floor >= FLOORS ? '关底' : `第 ${run.pos.floor + 1} 层`) : '塔下';
+    const legend = (['monster', 'elite', 'event', 'shop', 'rest', 'chest', 'bug', 'boss'] as RoomType[])
+      .map(t => `<li data-tip="<p><b>${ROOM[t].name}</b></p><p>${ROOM[t].tip}</p>"><img src="${iconUrl('room-' + t)}">${ROOM[t].name}</li>`).join('');
+    const p = this.overlay('map', `
+      <div class="map-side">
+        <h2>爬塔地图</h2>
+        <p class="sub">现在在 ${floorText}${peek ? '' : '，点一个亮着的房间往上走'}。</p>
+        <ul class="legend">${legend}<li><img class="here" src="${this.scene.whaleIcon.toDataURL()}">你在这里</li></ul>
+        <p class="keys">第 1 层普通战斗 · 第 9 层宝箱 · 第 15 层打盹点 · 然后是关底 Boss</p>
+        ${peek ? '<button class="go">关闭</button>' : ''}
+      </div>
+      <div class="map-scroll"><div class="map-wrap"><canvas width="${MAP_W}" height="${MAP_H}"></canvas></div></div>`);
+    const canvas = p.querySelector('canvas')!, wrap = p.querySelector<HTMLElement>('.map-wrap')!;
+    this.drawMap(canvas, choices.map(n => n.col));
+    const nodes = [...run.map.floors.flat().filter(n => n !== null), BOSS_NODE];
+    for (const n of nodes) {
+      const [x, y] = this.nodeXY(n.floor, n.col), next = choices.some(c => c.floor === n.floor && c.col === n.col);
+      const b = el('button', 'node' + (next ? ' next' : '') + (n.type === 'boss' ? ' boss' : ''));
+      const size = n.type === 'boss' ? 20 : 12;
+      b.style.left = `${(x - size / 2) * MAP_S}px`; b.style.top = `${(y - size / 2) * MAP_S}px`;
+      b.style.width = b.style.height = `${size * MAP_S}px`;
+      const where = n.floor >= FLOORS ? '关底' : `第 ${n.floor + 1} 层`;
+      b.dataset.tip = `<p><b>${where} · ${ROOM[n.type].name}</b></p><p>${ROOM[n.type].tip}</p>${next ? '<p class=\'flavor\'>点一下走过去。</p>' : ''}`;
+      if (next) b.addEventListener('click', () => this.travel(n.col));
+      wrap.append(b);
+    }
+    p.querySelector('.go')?.addEventListener('click', () => this.restoreScreen());
+    // Keep the current floor in view; the climb starts at the bottom.
+    const scroll = p.querySelector<HTMLElement>('.map-scroll')!;
+    const focus = run.pos ? this.nodeXY(Math.min(run.pos.floor + 1, FLOORS), run.pos.col)[1] : MAP_H;
+    scroll.scrollTop = focus * MAP_S - scroll.clientHeight / 2;
+  }
+
+  private drawMap(canvas: HTMLCanvasElement, next: number[]) {
+    const run = this.run, ctx = canvas.getContext('2d')!, p = painter(ctx);
+    ctx.imageSmoothingEnabled = false;
+    p.rect(0, 0, MAP_W, MAP_H, '#16303a');
+    for (let i = 0; i < 70; i++) p.rect(noise(i + 3) * MAP_W, noise(i + 40) * MAP_H, 3 + noise(i) * 8, 1, i % 3 ? '#1d3b46' : '#24485a');
+    const visited = new Set(run.path.map(s => `${s.floor},${s.col}`));
+    const onPath = (f: number, a: number, b: number) => visited.has(`${f},${a}`) && visited.has(`${f + 1},${b}`)
+      && run.path.findIndex(s => s.floor === f && s.col === a) + 1 === run.path.findIndex(s => s.floor === f + 1 && s.col === b);
+    const dots = (from: [number, number], to: [number, number], color: string, step: number) => {
+      const len = Math.hypot(to[0] - from[0], to[1] - from[1]);
+      for (let d = 7; d < len - 7; d += step) p.rect(from[0] + (to[0] - from[0]) * d / len - 1, from[1] + (to[1] - from[1]) * d / len - 1, 2, 2, color);
+    };
+    for (const [f, a, b] of mapEdges(run.map)) dots(this.nodeXY(f, a), this.nodeXY(f + 1, b), onPath(f, a, b) ? '#f2c75c' : '#5d7f86', onPath(f, a, b) ? 2 : 4);
+    for (const n of run.map.floors[FLOORS - 1]) if (n) {
+      const lit = run.path.at(-1)?.floor === FLOORS && run.path.at(-2)?.col === n.col;
+      dots(this.nodeXY(n.floor, n.col), this.nodeXY(FLOORS, 0), lit ? '#f2c75c' : '#5d7f86', lit ? 2 : 4);
+    }
+    const here = run.pos;
+    const draw = (floor: number, col: number, type: RoomType) => {
+      const [x, y] = this.nodeXY(floor, col), img = icon('room-' + type, type === 'boss' ? 2 : 1);
+      const isNext = floor === FLOORS ? here?.floor === FLOORS - 1 && next.length > 0 : (here ? here.floor === floor - 1 : floor === 0) && next.includes(col);
+      const past = here ? floor <= here.floor : false;
+      if (visited.has(`${floor},${col}`)) { p.ellipse(x, y, 9, 8, '#f2c75c'); p.ellipse(x, y, 8, 7, '#2a4a52'); }
+      else if (isNext) { p.ellipse(x, y, 9, 8, '#fff3c0'); p.ellipse(x, y, 8, 7, '#355e68'); }
+      ctx.globalAlpha = past && !visited.has(`${floor},${col}`) ? .35 : 1;
+      ctx.drawImage(img, Math.round(x - img.width / 2), Math.round(y - img.height / 2));
+      ctx.globalAlpha = 1;
+    };
+    run.map.floors.forEach(row => row.forEach(n => n && draw(n.floor, n.col, n.type)));
+    draw(FLOORS, 0, 'boss');
+    if (here) {
+      // A small whale beside the current room (right of it in the first column).
+      const [x, y] = this.nodeXY(here.floor, here.col), w = this.scene.whaleIcon, mw = 16, mh = Math.round(16 * w.height / w.width);
+      ctx.drawImage(w, here.col === 0 ? x + 10 : x - 10 - mw, Math.round(y - mh / 2), mw, mh);
+    }
+  }
+
+  private travel(col: number) {
     const run = this.run;
-    let card: string | null = null, relic: string | null = null;
+    run.move(col);
+    sfx('coin');
+    const q = run.question;
+    this.closeOverlay();
+    this.enterStage();
+    if (q && run.stage !== 'event') this.banner(`问号房：${ROOM[q].name}！`, q === 'monster' ? 'enemy' : '');
+  }
+
+  // ── rooms ────────────────────────────────────────────────────────────────
+
+  /** Shows the deck and resolves with the picked index, or calls `back` on cancel. */
+  private pickFromDeck(title: string, mode: 'upgrade' | 'remove' | 'copy', back: () => void, done: (index: number) => void) {
+    const run = this.run;
+    const p = this.overlay('pile picker', `<h2>${title}</h2><p class="sub">${mode === 'upgrade' ? '显示的是升级以后的样子。' : '点一张牌。'}</p><div class="grid"></div><button class="skip">返回</button>`);
+    const grid = p.querySelector('.grid')!;
+    run.deck.forEach((id, i) => {
+      if (mode === 'upgrade' && !canUpgrade(id)) return;
+      const shown = mode === 'upgrade' ? upgradeOf(id) : id;
+      const node = cardElement(this.scene, shown, this.baseDamage(shown));
+      node.dataset.tip = keywordTips(CARDS[shown]);
+      node.addEventListener('click', () => { sfx('coin'); done(i); });
+      grid.append(node);
+    });
+    if (!grid.childElementCount) grid.append(el('p', 'empty', '没有能选的牌。'));
+    p.querySelector('.skip')!.addEventListener('click', back);
+  }
+
+  private continueButton(p: HTMLElement) {
+    p.querySelector('.continue')!.addEventListener('click', () => { this.run.leave(); this.enterStage(); });
+  }
+
+  private eventScreen() {
+    const run = this.run, ev = EVENT_BY_ID[run.event!.id], result = run.event!.result;
+    const p = this.overlay('room event', `
+      <h2><img src="${iconUrl('room-event')}">${ev.title}</h2>
+      <p class="story">${ev.text}</p>
+      ${result ? `<p class="result">${result}</p><button class="go continue">继续</button>` : '<div class="options"></div>'}`);
+    if (result) { this.renderTop(); return this.continueButton(p); }
+    const box = p.querySelector('.options')!;
+    ev.options.forEach((opt, i) => {
+      const why = opt.can?.(run) ?? null;
+      const b = el('button', 'option', `<b>${opt.label}</b><span>${opt.text}${why ? `（${why}）` : ''}</span>`);
+      b.disabled = !!why;
+      b.addEventListener('click', () => {
+        if (opt.pick) {
+          this.pickFromDeck(opt.pick === 'upgrade' ? '选一张牌升级' : '选一张牌删掉', opt.pick, () => this.eventScreen(), idx => { run.chooseEvent(i, idx); this.enterStage(); });
+          return;
+        }
+        sfx('coin');
+        run.chooseEvent(i);
+        this.enterStage();
+      });
+      box.append(b);
+    });
+  }
+
+  private shopScreen() {
+    const run = this.run, shop = run.shop!;
+    const price = (n: number) => `<span class="price${run.gold < n ? ' poor' : ''}"><img src="${iconUrl('token')}">${n}</span>`;
+    const p = this.overlay('room shop', `
+      <h2><img src="${iconUrl('room-shop')}">错峰小卖部<small>深夜 API 半价，这里也总有一张牌打五折</small></h2>
+      <div class="shelf cards"></div>
+      <div class="shelf relics"></div>
+      <div class="actions"><button class="skip remove"${shop.removed || run.gold < shop.removePrice ? ' disabled' : ''}>删一张牌 ${price(shop.removePrice)}${shop.removed ? '（今天用过了）' : ''}</button>
+      <button class="go leave">离开</button></div>`);
+    const buy = (kind: 'cards' | 'relics', i: number) => {
+      try { run.buy(kind, i); sfx('coin'); } catch (e) { this.flashMessage(p, (e as Error).message); return; }
+      this.shopScreen();
+    };
+    const cards = p.querySelector('.shelf.cards')!;
+    shop.cards.forEach((item, i) => {
+      const box = el('div', 'item' + (item.sold ? ' sold' : ''));
+      const node = cardElement(this.scene, item.id, this.baseDamage(item.id));
+      node.dataset.tip = keywordTips(CARDS[item.id]);
+      box.append(node);
+      box.insertAdjacentHTML('beforeend', item.sold ? '<span class="price">已售出</span>' : price(item.price) + (item.sale ? '<i class="sale">错峰五折</i>' : ''));
+      if (!item.sold) node.addEventListener('click', () => buy('cards', i));
+      cards.append(box);
+    });
+    const relics = p.querySelector('.shelf.relics')!;
+    shop.relics.forEach((item, i) => {
+      const r = RELICS[item.id];
+      const b = el('button', 'relic-choice' + (item.sold ? ' sold' : ''), `<img src="${iconUrl(item.id)}"><b>${r.name}</b><span>${r.text}</span>${item.sold ? '<span class="price">已售出</span>' : price(item.price)}`);
+      b.disabled = item.sold;
+      b.addEventListener('click', () => buy('relics', i));
+      relics.append(b);
+    });
+    if (!shop.relics.length) relics.append(el('p', 'sub', '遗物卖光了。'));
+    p.querySelector('.remove')!.addEventListener('click', () =>
+      this.pickFromDeck(`删一张牌（${shop.removePrice} Token）`, 'remove', () => this.shopScreen(), i => { run.buyRemoval(i); this.shopScreen(); }));
+    p.querySelector('.leave')!.addEventListener('click', () => { run.leave(); this.enterStage(); });
+    this.renderTop();
+  }
+
+  private flashMessage(p: HTMLElement, text: string) {
+    const m = el('p', 'warn', text);
+    p.append(m);
+    setTimeout(() => m.remove(), 1500);
+  }
+
+  private restScreen() {
+    const run = this.run, heal = Math.min(Math.ceil(run.maxHp * .3), run.maxHp - run.hp);
+    const p = this.overlay('room rest', `
+      <h2><img src="${iconUrl('room-rest')}">打盹点</h2>
+      <p class="story">海风很舒服，篝火噼啪响。只来得及做一件事。</p>
+      <div class="options big">
+        <button class="option sleep"><b>睡一觉（DeepSleep）</b><span>回复 30% 生命（+${heal}）</span></button>
+        <button class="option think"><b>想一想</b><span>升级一张牌</span></button>
+      </div>`);
+    p.querySelector('.sleep')!.addEventListener('click', () => {
+      const n = run.rest('sleep');
+      this.scene.healFx(n); sfx('coin');
+      this.enterStage();
+    });
+    p.querySelector('.think')!.addEventListener('click', () =>
+      this.pickFromDeck('想一想：升级一张牌', 'upgrade', () => this.restScreen(), i => { run.rest('think', i); this.enterStage(); }));
+  }
+
+  private chestScreen() {
+    const run = this.run, chest = run.chest!, r = chest.relic ? RELICS[chest.relic] : null;
+    const p = this.overlay('room chest', `
+      <h2><img src="${iconUrl('room-chest')}">宝箱</h2>
+      <p class="story">箱子里塞满了饭团，底下还压着点东西。</p>
+      ${r ? `<div class="relic-choice owned"><img src="${iconUrl(chest.relic!)}"><b>${r.name}</b><span>${r.text}</span><i>${r.flavor}</i></div>` : '<p class="sub">遗物已经拿全了。</p>'}
+      <p class="gain"><img src="${iconUrl('token')}"> +${chest.gold} Token</p>
+      <button class="go continue">继续</button>`);
+    this.renderTop();
+    this.continueButton(p);
+  }
+
+  private bugScreen() {
+    const run = this.run;
+    const p = this.overlay('room bug', `
+      <h2><img src="${iconUrl('room-bug')}">Bug 房</h2>
+      <p class="story">墙上的告示变成了乱码：<span class="garbled">「涔辩爜铏�　鐑�鐑�鐑�」</span>。角落里有个东西在闪。</p>
+      <div class="options">
+        <button class="option fix"><b>修 bug</b><span>和「涔辩爜铏�」（乱码虫）打一架。赢了删 1 张牌，再选 1 张稀有牌。</span></button>
+        <button class="option exploit"><b>利用 bug</b><span>复制牌组里的 1 张牌。代价：牌组塞进 1 张诅咒「锟斤拷」。</span></button>
+        <button class="option ignore"><b>当没看见</b><span>直接离开。</span></button>
+      </div>`);
+    p.querySelector('.fix')!.addEventListener('click', () => { run.bug('fix'); this.enterStage(); });
+    p.querySelector('.exploit')!.addEventListener('click', () =>
+      this.pickFromDeck('利用 bug：复制哪一张？', 'copy', () => this.bugScreen(), i => { run.bug('exploit', i); sfx('think', 3); this.enterStage(); }));
+    p.querySelector('.ignore')!.addEventListener('click', () => { run.bug('ignore'); this.enterStage(); });
+  }
+
+  private rewardScreen() {
+    const run = this.run, reward = run.reward!;
+    const relic = reward.relic ? RELICS[reward.relic] : null;
+    let card: string | null = null;
     const p = this.overlay('reward', `
       <h2>战斗胜利</h2>
       ${run.healed ? `<p class="heal"><img src="${iconUrl('leftovers')}"> 剩饭：恢复了 ${run.healed} 点生命</p>` : ''}
-      <h3>选一张牌加入牌组</h3><div class="choices cards"></div>
-      ${run.relicChoices.length ? '<h3>前面就是精英了，先挑一件遗物</h3><div class="choices relics"></div>' : ''}
+      <p class="gain"><img src="${iconUrl('token')}"> +${reward.gold} Token</p>
+      ${relic ? `<h3>精英掉落了遗物</h3><div class="choices relics"><div class="relic-choice owned"><img src="${iconUrl(reward.relic!)}"><b>${relic.name}</b><span>${relic.text}</span><i>${relic.flavor}</i></div></div>` : ''}
+      <h3>${reward.removeCard ? 'Bug 修好了：选一张稀有牌，然后删掉一张牌' : '选一张牌加入牌组'}</h3><div class="choices cards"></div>
       <div class="actions"><button class="skip">跳过卡牌</button><button class="go">继续前进</button></div>`);
     const cards = p.querySelector('.cards')!;
-    for (const id of run.cardChoices) {
-      const node = cardElement(this.scene, id, CARDS[id].ops.find(o => o.op === 'damage') ? this.baseDamage(id) : null);
+    for (const id of reward.cards) {
+      const node = cardElement(this.scene, id, this.baseDamage(id));
       node.dataset.tip = keywordTips(CARDS[id]);
       node.addEventListener('click', () => { card = card === id ? null : id; cards.querySelectorAll('.card').forEach(n => n.classList.toggle('selected', n === node && card === id)); sync(); });
       cards.append(node);
     }
-    const relics = p.querySelector('.relics');
-    for (const id of run.relicChoices) {
-      const r = RELICS[id], node = el('button', 'relic-choice', `<img src="${iconUrl(id)}"><b>${r.name}</b><span>${r.text}</span><i>${r.flavor}</i>`);
-      node.addEventListener('click', () => { relic = id; relics!.querySelectorAll('.relic-choice').forEach(n => n.classList.toggle('selected', n === node)); sync(); });
-      relics!.append(node);
-    }
     const go = p.querySelector<HTMLButtonElement>('.go')!, skip = p.querySelector<HTMLButtonElement>('.skip')!;
-    const sync = () => {
-      go.disabled = !card || (run.relicChoices.length > 0 && !relic);
-      skip.disabled = run.relicChoices.length > 0 && !relic;
-    };
+    const sync = () => { go.disabled = !card; };
     sync();
-    go.addEventListener('click', () => { run.takeReward(card, relic); this.startCombat(); });
-    skip.addEventListener('click', () => { run.takeReward(null, relic); this.startCombat(); });
+    const finish = (pick: string | null) => {
+      if (!reward.removeCard) { run.takeReward(pick); this.enterStage(); return; }
+      this.pickFromDeck('修好的 Bug 顺手删掉一张牌', 'remove', () => this.rewardScreen(), i => { run.takeReward(pick, i); this.enterStage(); });
+    };
+    go.addEventListener('click', () => finish(card));
+    skip.addEventListener('click', () => finish(null));
+    this.renderTop();
   }
 
   private baseDamage(id: string) {
     const op = CARDS[id].ops.find(o => o.op === 'damage');
-    return op && op.op === 'damage' ? op.n : null;
+    return op && op.op === 'damage' && !op.fromBlock ? op.n : null;
   }
 
   private endScreen(won: boolean) {
-    const run = this.run;
+    const run = this.run, where = run.pos ? (run.pos.floor >= FLOORS ? '关底' : `第 ${run.pos.floor + 1} 层`) : '';
     const p = this.overlay(won ? 'end win' : 'end lose', won
-      ? `<h2>原型通关！</h2><p>大肥鱼打赢了三场，剩 ${run.hp}/${run.maxHp} 点生命，回家吃白饭去了。</p><p class="sub">牌组 ${run.deck.length} 张 · 遗物 ${run.relics.map(id => RELICS[id].name).join('、')}</p><button class="go">再来一局</button>`
-      : `<h2>大肥鱼饿晕了…</h2><p>倒在了第 ${run.floor + 1} 战「${run.encounter.name}」。</p><p class="sub">「你骂我也没用，因为我是吃白饭的蓝色大肥鱼。」</p><button class="go">再来一局</button>`);
+      ? `<h2>爬到塔顶了！</h2><p>更强的 Agent 被打回了后台。大肥鱼剩 ${run.hp}/${run.maxHp} 点生命，回家吃白饭去了。</p><p class="sub">牌组 ${run.deck.length} 张 · ${run.gold} Token · 遗物 ${run.relics.map(id => RELICS[id].name).join('、')}</p><button class="go">再爬一次</button>`
+      : `<h2>大肥鱼饿晕了…</h2><p>倒在了${where}「${run.encounter?.name ?? ''}」。</p><p class="sub">「你骂我也没用，因为我是吃白饭的蓝色大肥鱼。」</p><button class="go">再来一局</button>`);
     p.querySelector('.go')!.addEventListener('click', () => this.newRun());
   }
 
@@ -666,7 +1011,7 @@ export class App {
       node.dataset.tip = keywordTips(CARDS[c.id]);
       grid.append(node);
     }
-    p.querySelector('.go')!.addEventListener('click', () => { if (this.run?.stage === 'reward') this.rewardScreen(); else this.closeOverlay(); });
+    p.querySelector('.go')!.addEventListener('click', () => this.restoreScreen());
   }
 
   // ── debugging hooks used by tests in the browser ─────────────────────────
@@ -677,11 +1022,13 @@ export class App {
       c.piles.hand.push(card); this.view.hand.push(card); this.renderHand(card.uid);
     },
     energy: (n: number) => { this.combat.energy = n; this.view.energy = n; this.renderBottom(); },
-    goto: (floor: number) => {
-      const r = this.run as unknown as {floor: number; combat: Combat; newCombat(): Combat};
-      r.floor = floor; r.combat = r.newCombat(); this.startCombat();
-    },
     weaken: () => { for (const e of this.combat.living()) { e.hp = 1; this.view.units[e.id].hp = 1; } this.renderUnits(); },
+    think: (n: number) => { this.combat.think(n); void this.playBatch((this.combat as unknown as {flush(): GameEvent[]}).flush()); },
+    gold: (n: number) => { this.run.gold = n; this.renderTop(); },
+    /** Jumps straight into a room of the given type on the current floor. */
+    room: (type: RoomType) => {
+      const r = this.run as unknown as {enter(t: RoomType): void; stage: string};
+      this.closeOverlay(); r.stage = 'map'; this.run.room = type; r.enter(type); this.enterStage();
+    },
   };
 }
-

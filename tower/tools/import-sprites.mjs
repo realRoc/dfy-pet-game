@@ -6,11 +6,12 @@
 // generated art reading as a single pixel sprite.
 import fs from 'node:fs';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {PNG} from 'pngjs';
 
 const src = process.argv[2];
 if (!src) { console.error('用法: node tools/import-sprites.mjs <demos/whale-tail/assets 目录>'); process.exit(1); }
-const out = path.join(path.dirname(new URL(import.meta.url).pathname), '../src/assets');
+const out = path.join(path.dirname(fileURLToPath(import.meta.url)), '../src/assets');
 
 const read = f => PNG.sync.read(fs.readFileSync(path.join(src, f)));
 const grid = (cols, rows) => Array.from({length: cols * rows}, (_, i) => [(i % cols) / cols, Math.floor(i / cols) / rows, 1 / cols, 1 / rows]);
