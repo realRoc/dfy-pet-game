@@ -150,7 +150,6 @@ export class Combat {
     this.inPlayerTurn = false;
     for (const c of [...this.piles.hand]) {
       this.remove(c);
-      delete c.cost;
       if (CARDS[c.id].ethereal) this.exhaust(c, 'ethereal');
       else this.moveTo(c, 'discard', 'discard');
     }
@@ -400,7 +399,9 @@ export class Combat {
     if (!this.result) this.think(1);
   }
 
+  /** Every pile but the hand goes through here, so a cost override (only good for this turn, in hand) ends here too. */
   private moveTo(card: Card, pile: Pile, reason: NonNullable<Extract<GameEvent, {t: 'cardTo'}>['reason']>) {
+    delete card.cost;
     this.piles[pile].push(card);
     this.emit({t: 'cardTo', card, pile, reason});
   }

@@ -56,7 +56,7 @@ export interface CardDef {
   upgraded?: boolean;
 }
 
-/** A card in a fight. `cost` overrides the printed cost until it is played. */
+/** A card in a fight. `cost` overrides the printed cost while the card stays in hand this turn. */
 export interface Card { uid: number; id: string; cost?: number }
 
 export interface Unit {

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {Combat} from '../src/core/combat';
+import {Combat, MAX_HAND} from '../src/core/combat';
 import {Run} from '../src/core/run';
 import {CARDS} from '../src/content/cards';
 import type {GameEvent} from '../src/core/types';
@@ -130,6 +130,33 @@ describe('深度思考', () => {
     const whale = c.piles.hand.find(x => x.id === 'whaleBreach+')!;
     expect(whale).toBeTruthy();
     expect(c.costOf(whale)).toBe(0);
+  });
+
+  it('满手牌时思考完毕的巨鲸进弃牌堆不带 0 费，洗回来重抽是原价；打出后也恢复原价', () => {
+    const c = ordered(['fullSize', ...Array(12).fill('ironBowl')], ['dummy'], ['distilled']);
+    c.start();
+    c.enemies[0].hp = c.enemies[0].maxHp = 500;
+    c.play(inHand(c, 'fullSize'));
+    const base = CARDS['whaleBreach+'].cost;
+    // 手牌塞满 10 张，再思考完毕：巨鲸直接进弃牌堆
+    while (c.piles.hand.length < MAX_HAND) c.piles.hand.push(c.piles.draw.pop()!);
+    c.think(c.thinkLimit);
+    const full = c.piles.discard.find(x => x.id === 'whaleBreach+')!;
+    expect(full).toBeTruthy();
+    expect(c.costOf(full)).toBe(base);
+    // 手牌有空位时进手牌是 0 费；打出去（消耗）后恢复原价
+    c.piles.hand.pop();
+    c.think(c.thinkLimit);
+    const played = c.piles.hand.find(x => x.id === 'whaleBreach+')!;
+    expect(c.costOf(played)).toBe(0);
+    c.play(played.uid);
+    expect(c.costOf(played)).toBe(base);
+    // 抽牌堆清空，下回合从弃牌堆洗回来重抽
+    c.piles.discard.push(...c.piles.draw.splice(0));
+    c.endTurn();
+    const whales = [...c.piles.hand, ...c.piles.draw, ...c.piles.discard].filter(x => x.id === 'whaleBreach+');
+    expect(whales).toEqual([full]);
+    expect(c.costOf(full)).toBe(base);
   });
 
   it('巨鲸破浪每打出过一次，下一次 +8', () => {

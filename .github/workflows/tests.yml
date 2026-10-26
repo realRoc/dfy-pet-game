@@ -23,3 +23,20 @@ jobs:
       # 含动作动画的真解码测试（tests/test_clips.py），没装上 PyAV 会跳过，这里先确认装上了
       - run: python -c "import clips; assert clips.AVAILABLE"
       - run: python -m unittest discover -s tests -v
+
+  # 爬塔的规则测试（vitest）和类型检查 + 打包；content/tower 是否过期由上面的 Python 测试按源码哈希检查
+  tower:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tower
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: tower/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
