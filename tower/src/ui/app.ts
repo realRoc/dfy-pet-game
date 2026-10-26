@@ -103,7 +103,7 @@ export class App {
   }
 
   private afterCombat() {
-    const run = this.run, won = this.combat.result === 'victory';
+    const run = this.run, combat = this.combat, won = combat.result === 'victory';
     run.finishCombat();
     if (won && run.healed) {
       this.scene.healFx(run.healed);
@@ -112,6 +112,8 @@ export class App {
       this.renderTop();
     }
     setTimeout(() => {
+      // 重开 is clickable during this pause; a new run must not get the old one's screen.
+      if (this.run !== run || run.combat !== combat) return;
       if (run.stage === 'reward') this.rewardScreen();
       else if (run.stage === 'cleared') this.endScreen(true);
       else this.endScreen(false);
