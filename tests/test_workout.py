@@ -146,7 +146,7 @@ class PlayerTest(unittest.TestCase):
         self.assertEqual(layers[0][:2], ("wall_sit", True))
 
     def test_poses_cycle_through_all_frames(self):
-        """每个动作播一遍，用到的帧正好是它 cycle 里的那些，交叉淡化的不透明度加起来是 1。"""
+        """每个动作播一遍，用到的帧正好是它时间轴里的那些；叠化时也总有一张是实的，人不会变半透明。"""
         for key, mv in workout.MOVES.items():
             p = WorkoutPlayer(workout.single_move_plan(key, 12), prep=False, slack=False)
             seen = set()
@@ -155,7 +155,7 @@ class PlayerTest(unittest.TestCase):
                 if p.finished:
                     break
                 layers = p.pose()[0]
-                self.assertAlmostEqual(sum(a for _, _, a in layers), 1.0, places=6)
+                self.assertAlmostEqual(max(a for _, _, a in layers), 1.0, places=6)
                 seen |= {f for f, _, _ in layers}
             self.assertEqual(seen, mv.frames, key)
 
@@ -216,28 +216,28 @@ class PetWorkoutTest(unittest.TestCase):
                                                    {"move": "glute_bridge_single", "secs": 3, "side": "left"}]})
         h0 = pet.height()
         pet.start_workout(plan)
-        self.assertTrue(pet.hud.isVisible())
+        self.assertTrue(pet.workout.show_timer)
         self.assertGreaterEqual(pet.width(), pet.win_w)
-        pet.grab()                          # 画一帧不报错
-        pet.hud.grab()
+        pet.grab()                          # 画一帧（含右上角倒计时）不报错
         self.tick(workout.PREP_SECS + 5.5)
         self.assertEqual(pet.workout.seg.move, "glute_bridge_single")
         pet.grab()
-        pet.workout_pause()
+        pet._on_single_click()              # 跟练时单击是暂停
         self.assertTrue(pet.workout.paused)
-        pet.hud.grab()
+        self.assertFalse(pet.function_panel.isVisible())
+        pet.grab()
         pet.workout_pause()
+        self.assertFalse(pet.workout.paused)
         pet.play_expression("happy")       # 练着的时候不插表情
         self.assertFalse(pet.expr.active)
         self.tick(4 + workout.FINISH_SECS + 1)
         self.assertIsNone(pet.workout)
-        self.assertFalse(pet.hud.isVisible())
         self.assertEqual(pet.height(), h0)
 
     def test_stop_midway_and_preview(self):
         pet = self.pet
         pet.preview_move("wall_sit")
-        self.assertFalse(pet.hud.isVisible())   # 预览不挂计时面板
+        self.assertFalse(pet.workout.show_timer)   # 预览不显示倒计时
         self.tick(1)
         pet.grab()
         pet.stop_workout()

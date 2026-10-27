@@ -4,7 +4,7 @@
 - macOS 适配：鼠标穿透改用 Qt 自带标志，开机自启用 LaunchAgent，字体按平台选
 - 新增「做个表情」「喂食」「说句话」「设置城市」菜单和表情动作（expressions.py）
 - 新增 dsh-pet 的动作动画（舞狮、玩玩具汽车……，clips.py），放进「做个表情」，闲着时也会自己播
-- 新增健身跟练（workout.py）：按训练计划做动作、报下一个、计时，脚下挂计时面板（workout_hud.py）
+- 新增健身跟练（workout.py）：按训练计划做动作、报下一个，右上角两位数倒计时（红色练、绿色歇）
 - 天气查询改到后台线程，不卡界面
 """
 import math
@@ -18,7 +18,7 @@ import threading
 import psutil
 import requests
 from PySide6.QtCore import Qt, QTimer, QPoint, QPointF, QRectF, QUrl
-from PySide6.QtGui import QPainter, QFont, QColor, QIcon, QFontMetrics, QPolygonF, QDesktopServices
+from PySide6.QtGui import QPainter, QFont, QColor, QIcon, QFontMetrics, QPolygonF, QDesktopServices, QPen
 from PySide6.QtWidgets import (QApplication, QWidget, QMenu, QSystemTrayIcon, QMessageBox,
                                QInputDialog, QLineEdit, QHBoxLayout, QVBoxLayout, QPushButton,
                                QFrame, QDialog, QToolButton)
@@ -30,7 +30,6 @@ import clips
 from clips import ClipPlayer
 import workout
 from workout import WorkoutPlayer, FrameCache, Announcer
-from workout_hud import WorkoutHUD
 
 try:
     import pynvml
@@ -292,8 +291,6 @@ class PetWindow(QWidget):
         self.workout = None
         self.frames = FrameCache()
         self.announcer = Announcer()
-        self.hud = WorkoutHUD(self.workout_back, self.workout_pause, self.workout_skip, self.stop_workout)
-        self._hud_sig = None
         self._layout_for_size()
 
         # 状态
@@ -503,23 +500,76 @@ class PetWindow(QWidget):
             self._paint_bubble(p, cx, max(4.0, self.head_room - BUBBLE_H + 4))
 
     def _paint_workout(self, p, cx, bottom, now):
-        """跟练时画姿势帧（脚底对齐，交叉淡化），再叠头顶符号。"""
-        layers, (dx, dy, rot, sx, sy), fx = self.workout.pose()
+        """跟练时画姿势帧（脚底对齐，交叉淡化，模糊帧的残影垫在下面），再叠头顶符号。"""
+        pose = self.workout.pose()
+        dx, dy, rot, sx, sy = pose.body
+        fx = pose.fx
         h = self.cur_h
         dpr = self.devicePixelRatioF()
         top = bottom - h
-        for name, mirror, alpha in layers:
+
+        def blit(name, mirror, alpha, ody):
             pix, ax, ay, w, hh = self.frames.get(name, h, dpr)
             p.save()
             p.setOpacity(alpha)
-            p.translate(cx + dx * h, bottom + dy * h)
+            p.translate(cx + dx * h, bottom + ody * h)
             p.rotate(rot)
             p.scale(sx * (-1 if mirror else 1), sy)
             p.drawPixmap(QRectF(-ax, -ay, w, hh), pix, QRectF(pix.rect()))
             p.restore()
+            return ay
+
+        for name, mirror, alpha, gdy in pose.ghosts:
+            blit(name, mirror, alpha, gdy)
+        for name, mirror, alpha in pose.layers:
+            ay = blit(name, mirror, alpha, dy)
             if alpha >= 0.5:
                 top = bottom + dy * h - ay * sy
         workout.draw_fx(p, fx, now, cx + dx * h, top, h)
+        if self.workout.show_timer:
+            self._paint_countdown(p, cx + 0.44 * h, bottom - 0.93 * h)
+
+    def _paint_countdown(self, p, x, y):
+        """右上角的倒计时：两位数秒数，红色是练、绿色是歇、蓝色是准备；外圈是这一段的进度，下面小字是第几个动作。"""
+        w = self.workout
+        if w.finished:
+            return
+        seg = w.seg
+        color = {"work": QColor(242, 72, 72), "rest": QColor(40, 178, 110), "prep": QColor(86, 134, 254)}[seg.kind]
+        if w.paused:
+            color = QColor(150, 150, 160)
+        secs = int(math.ceil(w.remaining - 1e-6))
+        r = self.cur_h * 0.105
+        if not w.paused and secs <= 3 and seg.kind != "rest":
+            r *= 1 + 0.15 * max(0.0, 1 - (secs - w.remaining) / 0.3)   # 最后 3 秒每秒跳一下
+        p.save()
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(255, 255, 255, 225))
+        p.drawEllipse(QPointF(x, y), r, r)
+        ring = QRectF(x - r + 2, y - r + 2, 2 * r - 4, 2 * r - 4)
+        pen = QPen(QColor(color.red(), color.green(), color.blue(), 60), max(2.0, r * 0.16))
+        p.setPen(pen)
+        p.drawEllipse(ring)
+        pen.setColor(color)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        p.setPen(pen)
+        left = w.remaining / seg.secs if seg.secs else 0.0
+        p.drawArc(ring, 90 * 16, int(360 * 16 * left))
+        text = "‖" if w.paused else (str(secs) if secs < 100 else f"{secs // 60}m")
+        f = QFont(UI_FONT)
+        f.setPixelSize(max(8, int(r * (0.95 if len(text) < 3 else 0.7))))
+        f.setBold(True)
+        p.setFont(f)
+        p.drawText(QRectF(x - r, y - r, 2 * r, 2 * r), Qt.AlignmentFlag.AlignCenter, text)
+        if seg.kind != "prep":
+            i, n = w.work_count()
+            f.setPixelSize(max(8, int(r * 0.42)))
+            f.setBold(False)
+            p.setFont(f)
+            p.setPen(QColor(90, 96, 120))
+            label = f"{i}/{n}" + (f" · {seg.round_no}/{w.rounds}轮" if w.rounds > 1 else "")
+            p.drawText(QRectF(x - 3 * r, y + r + 1, 6 * r, r * 0.6), Qt.AlignmentFlag.AlignCenter, label)
+        p.restore()
 
     def _paint_bubble(self, p, cx, top):
         if self.bubble_inner:
@@ -665,20 +715,6 @@ class PetWindow(QWidget):
                 self.announcer.speak(ev[1])
         if self.workout.done:
             self.stop_workout(finished=True)
-            return
-        self._follow_hud()
-
-    def _follow_hud(self):
-        if not self.hud.isVisible():
-            return
-        geo = (self.screen() or QApplication.primaryScreen()).availableGeometry()
-        foot = self.foot_global()
-        self.hud.follow(QPoint(foot.x(), self.y() + self.height()), self.y() + self.head_room, geo)
-        w = self.workout
-        sig = (w.idx, int(w.remaining), int(w.elapsed), w.paused, w.slacking, w.finished)
-        if sig != self._hud_sig:
-            self._hud_sig = sig
-            self.hud.refresh()
 
     # ---------- 跟练 ----------
     def start_workout(self, plan, prep=True):
@@ -695,17 +731,12 @@ class PetWindow(QWidget):
         self.workout = WorkoutPlayer(plan, rounds or None, prep=prep, slack=self.cfg.get("workout_slack", True))
         self.announcer.voice = self.cfg.get("workout_voice", True) and prep
         self._relayout()
-        self._hud_sig = None
-        if prep:
-            self.hud.show_for(self.workout)
-        self._follow_hud()
 
     def stop_workout(self, finished=False):
         if self.workout is None:
             return
         self.workout = None
         self.announcer.stop()
-        self.hud.hide()
         self._relayout()
         self.rest_until = self.t * TICK + random.randint(6000, 12000)
         if not finished:
@@ -717,17 +748,14 @@ class PetWindow(QWidget):
             paused = self.workout.toggle_pause()
             self.say("偷偷喘口气" if paused else "继续！", inner=paused)
             self.announcer.speak("暂停" if paused else "继续")
-            self._hud_sig = None
 
     def workout_skip(self):
         if self.workout:
             self.workout.skip()
-            self._hud_sig = None
 
     def workout_back(self):
         if self.workout:
             self.workout.back()
-            self._hud_sig = None
 
     def preview_move(self, key):
         self.start_workout(workout.single_move_plan(key), prep=False)
@@ -735,7 +763,8 @@ class PetWindow(QWidget):
     def _add_workout_menu(self, m):
         wm = m.addMenu("🏋️ 跟练")
         if self.workout:
-            wm.addAction("⏯ 暂停 / 继续", self.workout_pause)
+            wm.addAction("⏯ 暂停 / 继续（单击大肥鱼也行）", self.workout_pause)
+            wm.addAction("⏮ 重来这段", self.workout_back)
             wm.addAction("⏭ 跳过这段", self.workout_skip)
             wm.addAction("✕ 结束跟练", self.stop_workout)
             wm.addSeparator()
@@ -937,7 +966,11 @@ class PetWindow(QWidget):
             self.open_food_panel()
 
     def _on_single_click(self):
-        """单击：蹦跳回嘴 + 弹功能面板（不想用点鱼身外关闭）"""
+        """单击：蹦跳回嘴 + 弹功能面板（不想用点鱼身外关闭）；跟练时单击是暂停 / 继续"""
+        if self.workout and not self.workout.finished:
+            self.workout_pause()
+            self.chat_paused = False
+            return
         if random.random() < 0.7:
             self.jump_t = 1.0
         if random.random() < 0.6:
@@ -1069,15 +1102,6 @@ class PetWindow(QWidget):
         if ok and city.strip():
             self.cfg["city"] = city.strip()
             self.say(f"城市已设置为{city.strip()}")
-
-    def hideEvent(self, e):
-        self.hud.hide()
-        super().hideEvent(e)
-
-    def showEvent(self, e):
-        if self.workout and self.workout.segs[0].kind == "prep":
-            self.hud.show_for(self.workout)
-        super().showEvent(e)
 
     def contextMenuEvent(self, e):
         self.chat_paused = False

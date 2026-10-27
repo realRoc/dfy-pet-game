@@ -24,7 +24,7 @@
 }
 ```
 
-`side` 是 `left` / `right`，会显示成「（左）」「（右）」，左边的画面是镜像的。`label` 可以改动作在面板上的名字。
+`side` 是 `left` / `right`，会显示成「（左）」「（右）」，左边的画面是镜像的。`label` 可以改动作在气泡和语音里的名字。
 
 ### 可用的动作（move）
 
@@ -58,17 +58,29 @@ macOS 上会用系统的提示音（最后 3 秒滴答、开始、休息、完�
 `frames/` 里每张图是一个姿势，`frames.json` 记着脚底锚点和缩放基准，由
 [`tools/make_workout_frames.py`](../../tools/make_workout_frames.py) 从原图生成。
 
-原图是用 ChatGPT 的图片生成（Codex CLI 的 `image_gen`）画的：先拿 `sprites/正面.png` 当参考画出 `stand`，
-其余姿势都拿 `stand` 当角色和画风参考，提示词是统一的前缀加每个姿势的描述：
+原图是用 ChatGPT 的图片生成（Codex CLI 的 `image_gen`）画的，全部照着 `sprites/正面.png` 的 Q 版比例：
+大约 2.5 头身、头占身高四成、小短腿。提示词是统一的前缀加每个姿势的描述：
 
-> Use the attached image as the strict character and art-style reference … the same chibi whale-girl maid
-> (long wavy dark-blue hair, ahoge, lace maid headband, whale fins …, blue whale tail) … She wears navy athletic
-> shorts under the dress … Draw her FULL BODY … : *<姿势描述>*. Fully transparent background, no floor,
-> no drop shadow, no text, no border. Cute, wholesome.
+> Draw the SAME character in the SAME art style as the reference: a super-deformed Q-version chibi whale-girl maid,
+> about 2.5 heads tall — a huge head (roughly 40% of her total height), a small round body, and VERY SHORT, STUBBY
+> little legs … (do NOT make the legs long or the body slender) … She wears navy shorts under the dress; the dress
+> always modestly covers her. Pose: *<姿势描述>*. … Fully transparent background, no floor, no shadow, no text.
 
-姿势描述举例：`squat_wide` 是 "front view, at the bottom of a WIDE-stance sumo squat … both arms stretched straight
-forward"；`curtsy` 是 "doing a CURTSY LUNGE like an elegant maid curtsy … both hands lifting the hem of her skirt"；
-`hinge` / `lift` 是侧身拎着一个白色小电饭煲做硬拉。
+姿势描述举例：`squat_wide` 是宽距深蹲、裙摆盖住大腿和膝盖；`curtsy` 是两手提裙摆的女仆屈膝礼；
+`hinge` / `lift` 是侧身拎着一个白色小电饭煲做硬拉。中间姿势（`squat_wide_half`、`squat_narrow_half`、`lunge_half`）
+是拿对应的「蹲到底」那张当参考，让它画同一个动作的半程。
+
+## 动画
+
+每个动作是 `workout.py` 里的一条关键帧时间轴（`Key`），思路借鉴火纹战斗动画，只是动作都小：
+
+- **关键帧**：站好、蹲到底这类 pose 停得最久，节奏靠它们在时间轴上的位置
+- **过渡帧**：半蹲这类中间姿势一闪而过（0.1~0.16 秒），往下坐越来越快，站起来更快
+- **蓄力帧**：下蹲前微微挺高吸口气、跳之前先压低、硬拉前收紧
+- **模糊帧**：最快那一拍带上一张图的残影
+
+换姿势默认硬切（叠化会让人变半透明），只有正面 ↔ 侧面这种没有中间帧的才叠化一两帧。
+落到新姿势时压一下再弹两下（衣裙头发的余震），停着时有呼吸、咽水、嚼饭、发抖、偶尔腿软往下滑这些小起伏。
 
 加新动作：画好透明 PNG（文件名 = 帧名），在 `tools/make_workout_frames.py` 的 `POSES` 里写上这个姿势相对站直有多高，
 跑 `python tools/make_workout_frames.py <原图目录>`，再在 `workout.py` 的 `MOVES` 里加一条。
