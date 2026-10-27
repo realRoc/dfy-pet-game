@@ -31,6 +31,27 @@ except Exception as e:
     AVAILABLE = False
 
 
+class Library:
+    """另一套同样格式的透明动画（目录里一个 clips.json + 若干 webm），比如跟练动画。
+    clips.json 里每段可以带 offset：素材已经裁过时，crop 是文件里的范围，offset 是它在原画面里的位置。"""
+
+    def __init__(self, directory, table, ref, fade):
+        self.dir, self.clips, self.ref, self.fade = directory, table, ref, fade
+
+
+def load_library(directory, fade=0.0):
+    """读一套动画；没装 PyAV 或素材缺失返回 None。"""
+    if not AVAILABLE and "av" not in globals():
+        return None
+    try:
+        with open(os.path.join(directory, "clips.json"), encoding="utf-8") as f:
+            m = json.load(f)
+        return Library(directory, m["clips"], m["ref"], fade)
+    except Exception as e:
+        print("动画素材不可用:", directory, e)
+        return None
+
+
 def label(name):
     return CLIPS[name]["label"]
 
@@ -48,7 +69,8 @@ def add_menus(menu, play):
 
 
 class ClipPlayer:
-    def __init__(self):
+    def __init__(self, lib=None):
+        self.lib = lib          # None：dsh-pet 那套（模块里的 CLIP_DIR / CLIPS）
         self.name = None
         self.t = 0.0
         self.dur = 0.0
@@ -61,15 +83,24 @@ class ClipPlayer:
     def active(self):
         return self.name is not None
 
-    def start(self, name=None):
-        """开始播一段（不传则随机），返回名字；打不开或第一帧就解不出来返回 None。"""
-        if not AVAILABLE:
+    @property
+    def _clips(self):
+        return self.lib.clips if self.lib else CLIPS
+
+    @property
+    def _ref(self):
+        return self.lib.ref if self.lib else _REF
+
+    def start(self, name=None, fades=(True, True)):
+        """开始播一段（不传则随机），返回名字；打不开或第一帧就解不出来返回 None。
+        fades：(开头, 结尾) 要不要和三视图淡入淡出；首帧 / 尾帧不是正面站姿的那头别淡，不然会叠出个站着的虚影。"""
+        if not (AVAILABLE or self.lib):
             return None
         self.stop()
-        name = name or random.choice(list(CLIPS))
-        info = CLIPS[name]
+        name = name or random.choice(list(self._clips))
+        info = self._clips[name]
         try:
-            self._container = av.open(os.path.join(CLIP_DIR, info["file"]))
+            self._container = av.open(os.path.join(self.lib.dir if self.lib else CLIP_DIR, info["file"]))
             stream = self._container.streams.video[0]
             decoder = av.CodecContext.create("libvpx-vp9", "r")
             self._frames = (f for pkt in self._container.demux(stream) for f in decoder.decode(pkt))
@@ -78,7 +109,9 @@ class ClipPlayer:
             self.stop()
             return None
         self.name, self.t, self.dur = name, 0.0, info["frames"] / info["fps"]
+        self._fades = fades
         self._crop = QRect(*info["crop"])
+        self._pos = info.get("offset", info["crop"][:2])   # 画面在原画面里的位置
         self._decoded = -1
         self.image = None
         self._advance()
@@ -107,7 +140,7 @@ class ClipPlayer:
         """解到当前时间对应的帧；落后多帧时中间的只解码不转图。
         素材损坏、下载不完整之类解码出错时停掉这段，回到三视图，不往界面回调里抛异常。"""
         try:
-            target = int(self.t * CLIPS[self.name]["fps"])
+            target = int(self.t * self._clips[self.name]["fps"])
             frame = None
             while self._decoded < target:
                 frame = next(self._frames, None)
@@ -128,28 +161,41 @@ class ClipPlayer:
         """动画的不透明度：开头和结尾和三视图交叉淡化。"""
         if not self.name:
             return 0.0
-        return max(0.0, min(1.0, self.t / FADE, (self.dur - self.t) / FADE))
+        fade = self.lib.fade if self.lib else FADE
+        if fade <= 0:
+            return 1.0
+        a = self.t / fade if self._fades[0] else 1.0
+        b = (self.dur - self.t) / fade if self._fades[1] else 1.0
+        return max(0.0, min(1.0, a, b))
 
     def _scale(self, h):
-        return h / _REF["h"]
+        return h / self._ref["h"]
 
     def extents(self, h):
         """以脚底为原点，画面往左、右、上、下各伸出多少（逻辑像素），给窗口留位置用。"""
         if not self.name:
             return 0.0, 0.0, 0.0, 0.0
-        s = self._scale(h)
-        c = self._crop
-        return ((_REF["cx"] - c.x()) * s, (c.x() + c.width() - _REF["cx"]) * s,
-                (_REF["foot"] - c.y()) * s, max(0.0, (c.y() + c.height() - _REF["foot"]) * s))
+        return clip_extents(self._ref, self._pos, self._crop.width(), self._crop.height(), h)
 
-    def draw(self, p, foot_x, foot_y, h):
-        """按人物身高 h 缩放，脚底对齐 (foot_x, foot_y)。"""
+    def draw(self, p, foot_x, foot_y, h, mirror=False):
+        """按人物身高 h 缩放，脚底对齐 (foot_x, foot_y)；mirror 时以脚底中线左右翻过来。"""
         if not self.name or self.image is None:
             return
         s = self._scale(h)
-        c = self._crop
+        ref, (x, y) = self._ref, self._pos
         p.save()
         p.setOpacity(p.opacity() * self.blend())
-        p.drawImage(QRectF(foot_x + (c.x() - _REF["cx"]) * s, foot_y + (c.y() - _REF["foot"]) * s,
-                           c.width() * s, c.height() * s), self.image)
+        p.translate(foot_x, foot_y)
+        if mirror:
+            p.scale(-1, 1)
+        p.drawImage(QRectF((x - ref["cx"]) * s, (y - ref["foot"]) * s,
+                           self._crop.width() * s, self._crop.height() * s), self.image)
         p.restore()
+
+
+def clip_extents(ref, pos, w, hh, h):
+    """一段画面（左上角在原画面 pos、大小 w×hh）按人物身高 h 缩放后，以脚底为原点往左、右、上、下各伸出多少。"""
+    s = h / ref["h"]
+    x, y = pos
+    return ((ref["cx"] - x) * s, (x + w - ref["cx"]) * s,
+            (ref["foot"] - y) * s, max(0.0, (y + hh - ref["foot"]) * s))

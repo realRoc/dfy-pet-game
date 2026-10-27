@@ -61,12 +61,16 @@ dsh-pet 的动画是同一个大肥鱼形象的完整视频（640×360、24 帧�
   弓步蹲 → 硬拉 → 臀桥（双腿、右、左各 15 秒）→ 靠墙静蹲，动作 45 秒、休息 15 秒，菜单「轮数」可以连练几轮
 - 动作是原子化的，可以自己编排：在 `workouts/` 里写 JSON（菜单「打开计划文件夹…」有示例），格式和可用动作见
   [`content/workout/README.md`](content/workout/README.md)；「动作预览」能单独看每个动作
-- 她有自己的人设动作：休息时先喘气再喝水，最后 10 秒冒汗发抖，偶尔偷懒刷手机、干一碗白饭然后「被发现了！」，练完欢呼再瘫倒
+- 她有自己的人设动作：休息时先喘气再喝水，最后 10 秒冒汗发抖，练完欢呼再瘫倒（魂飞出来又钻回去）
+- 她会随机偷懒，8 种：站着打瞌睡吹鼻涕泡、偷刷手机、掏电饭煲干白饭、托腮「深度思考」、躺平摆烂、偷吃小鱼干、
+  假装在练、抱着尾巴打盹——每次都是 站好 → 偷懒 → 「被发现了！」→ 站好，回到站姿才接着练
 
 ![跟练](docs/workout.png)
 
-姿势帧是用 ChatGPT 的图片生成照着精灵图画的（提示词和流程见 [`content/workout/README.md`](content/workout/README.md)），
-同样适用 CC BY-NC-SA 4.0。
+跟练动画是 Seedance 2.5 照着原版 `sprites/正面.png` 生成的绿幕视频，抠成透明 webm（`content/workout/clips/`）。
+每段的首帧和尾帧都是同一张正面图，所以动作、偷懒、喝水之间怎么接都不会跳；躺着练的臀桥、蹲着的靠墙静蹲拆成
+躺下 / 循环 / 起身三段。提示词和流程见 [`content/workout/README.md`](content/workout/README.md)，同样适用 CC BY-NC-SA 4.0。
+没装 PyAV 时退回旧的一套：ChatGPT 画的姿势帧按关键帧时间轴播。
 
 ## 运行
 
@@ -112,7 +116,8 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 | `expressions.py` | 表情动作 |
 | `clips.py` | 动作动画播放器（PyAV 解码透明 webm） |
 | `workout.py` | 健身跟练：原子动作、训练计划、计时和大肥鱼的人设动作 |
-| `content/workout/` | 跟练的姿势帧（`frames/`）和内置训练计划（`plans/`） |
+| `content/workout/` | 跟练动画（`clips/`）、姿势帧（`frames/`，没装 PyAV 时用）和内置训练计划（`plans/`） |
+| `tools/make_workout_clips.py` | 用 Seedance 生成跟练动画（提示词都在这里），抠绿幕后写进 `content/workout/clips/` |
 | `tools/make_workout_frames.py` | 把生成的姿势原图裁边、统一大小、算脚底锚点，写进 `content/workout/frames/` |
 | `workouts/` | 自己写的训练计划（不进 git） |
 | `content/clips/` | dsh-pet 的动作动画 webm 和 `clips.json`（分类、人物外框） |
@@ -144,4 +149,4 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 
 本项目代码采用 [MIT](LICENSE) 协议；`sprites/` 目录和移植自 dafeiyu-pet 的代码同时沿用上游的 MIT 许可，并受上面的角色形象说明约束。
 `content/clips/*.webm` 的动作动画**不在 MIT 范围内**：沿用 dsh-pet 的素材条款（开源可用、禁止商用），角色形象适用 CC BY-NC-SA 4.0，见 [`content/clips/LICENSE.md`](content/clips/LICENSE.md)。
-`content/workout/frames/` 的跟练姿势帧同样**不在 MIT 范围内**，是角色形象的衍生图，适用 CC BY-NC-SA 4.0，见 [`content/workout/README.md`](content/workout/README.md)。
+`content/workout/clips/` 的跟练动画和 `content/workout/frames/` 的跟练姿势帧同样**不在 MIT 范围内**，是角色形象的衍生图，适用 CC BY-NC-SA 4.0，见 [`content/workout/README.md`](content/workout/README.md)。

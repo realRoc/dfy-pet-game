@@ -1,0 +1,370 @@
+{
+ "source": "Seedance 2.5（seedance-2-5-image-to-video-basic），首尾帧 = sprites/正面.png 贴绿幕；提示词见 tools/make_workout_clips.py",
+ "ref": {
+  "h": 540,
+  "cx": 480.0,
+  "foot": 850
+ },
+ "clips": {
+  "squat": {
+   "file": "squat.webm",
+   "crop": [
+    0,
+    0,
+    522,
+    694
+   ],
+   "offset": [
+    230,
+    168
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "squat_open_close": {
+   "file": "squat_open_close.webm",
+   "crop": [
+    0,
+    0,
+    532,
+    594
+   ],
+   "offset": [
+    222,
+    272
+   ],
+   "frames": 145,
+   "fps": 24
+  },
+  "curtsy_lunge": {
+   "file": "curtsy_lunge.webm",
+   "crop": [
+    0,
+    0,
+    460,
+    560
+   ],
+   "offset": [
+    252,
+    302
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "lunge": {
+   "file": "lunge.webm",
+   "crop": [
+    0,
+    0,
+    536,
+    584
+   ],
+   "offset": [
+    218,
+    288
+   ],
+   "frames": 145,
+   "fps": 24
+  },
+  "deadlift": {
+   "file": "deadlift.webm",
+   "crop": [
+    0,
+    0,
+    626,
+    682
+   ],
+   "offset": [
+    162,
+    276
+   ],
+   "frames": 169,
+   "fps": 24
+  },
+  "bridge_enter": {
+   "file": "bridge_enter.webm",
+   "crop": [
+    0,
+    0,
+    676,
+    568
+   ],
+   "offset": [
+    80,
+    306
+   ],
+   "frames": 97,
+   "fps": 24
+  },
+  "bridge_loop": {
+   "file": "bridge_loop.webm",
+   "crop": [
+    0,
+    0,
+    676,
+    362
+   ],
+   "offset": [
+    80,
+    512
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "bridge_single_loop": {
+   "file": "bridge_single_loop.webm",
+   "crop": [
+    0,
+    0,
+    698,
+    364
+   ],
+   "offset": [
+    70,
+    512
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "bridge_exit": {
+   "file": "bridge_exit.webm",
+   "crop": [
+    0,
+    0,
+    680,
+    590
+   ],
+   "offset": [
+    76,
+    284
+   ],
+   "frames": 97,
+   "fps": 24
+  },
+  "wall_sit_enter": {
+   "file": "wall_sit_enter.webm",
+   "crop": [
+    0,
+    0,
+    478,
+    574
+   ],
+   "offset": [
+    246,
+    290
+   ],
+   "frames": 97,
+   "fps": 24
+  },
+  "wall_sit_loop": {
+   "file": "wall_sit_loop.webm",
+   "crop": [
+    0,
+    0,
+    520,
+    494
+   ],
+   "offset": [
+    226,
+    370
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "wall_sit_exit": {
+   "file": "wall_sit_exit.webm",
+   "crop": [
+    0,
+    0,
+    524,
+    570
+   ],
+   "offset": [
+    202,
+    294
+   ],
+   "frames": 97,
+   "fps": 24
+  },
+  "tired": {
+   "file": "tired.webm",
+   "crop": [
+    0,
+    0,
+    512,
+    584
+   ],
+   "offset": [
+    212,
+    278
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "drink": {
+   "file": "drink.webm",
+   "crop": [
+    0,
+    0,
+    470,
+    556
+   ],
+   "offset": [
+    238,
+    298
+   ],
+   "frames": 145,
+   "fps": 24
+  },
+  "cheer": {
+   "file": "cheer.webm",
+   "crop": [
+    0,
+    0,
+    732,
+    740
+   ],
+   "offset": [
+    118,
+    116
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "collapse": {
+   "file": "collapse.webm",
+   "crop": [
+    0,
+    0,
+    894,
+    838
+   ],
+   "offset": [
+    58,
+    56
+   ],
+   "frames": 193,
+   "fps": 24
+  },
+  "lazy_doze": {
+   "file": "lazy_doze.webm",
+   "crop": [
+    0,
+    0,
+    604,
+    732
+   ],
+   "offset": [
+    176,
+    128
+   ],
+   "frames": 145,
+   "fps": 24
+  },
+  "lazy_phone": {
+   "file": "lazy_phone.webm",
+   "crop": [
+    0,
+    0,
+    506,
+    662
+   ],
+   "offset": [
+    256,
+    194
+   ],
+   "frames": 169,
+   "fps": 24
+  },
+  "lazy_rice": {
+   "file": "lazy_rice.webm",
+   "crop": [
+    0,
+    0,
+    472,
+    606
+   ],
+   "offset": [
+    244,
+    266
+   ],
+   "frames": 193,
+   "fps": 24
+  },
+  "lazy_think": {
+   "file": "lazy_think.webm",
+   "crop": [
+    0,
+    0,
+    552,
+    864
+   ],
+   "offset": [
+    222,
+    62
+   ],
+   "frames": 169,
+   "fps": 24
+  },
+  "lazy_flop": {
+   "file": "lazy_flop.webm",
+   "crop": [
+    0,
+    0,
+    636,
+    636
+   ],
+   "offset": [
+    212,
+    286
+   ],
+   "frames": 169,
+   "fps": 24
+  },
+  "lazy_fish": {
+   "file": "lazy_fish.webm",
+   "crop": [
+    0,
+    0,
+    524,
+    564
+   ],
+   "offset": [
+    242,
+    292
+   ],
+   "frames": 169,
+   "fps": 24
+  },
+  "lazy_fake": {
+   "file": "lazy_fake.webm",
+   "crop": [
+    0,
+    0,
+    474,
+    578
+   ],
+   "offset": [
+    256,
+    282
+   ],
+   "frames": 169,
+   "fps": 24
+  },
+  "lazy_tailnap": {
+   "file": "lazy_tailnap.webm",
+   "crop": [
+    0,
+    0,
+    680,
+    814
+   ],
+   "offset": [
+    222,
+    146
+   ],
+   "frames": 193,
+   "fps": 24
+  }
+ }
+}
