@@ -360,6 +360,8 @@ class PetWindow(QWidget):
         ext = None
         if self.clip.active:
             ext = self.clip.extents(self.cur_h)
+        elif self.workout and self.workout.clips:
+            ext = workout.clip_extents(self.cur_h)
         elif self.workout:
             ext = self.frames.extents(self.workout.frames_in_use(), self.cur_h)
         if ext:
@@ -477,6 +479,23 @@ class PetWindow(QWidget):
 
         cur_key = self._sprite_key()
         view = self.expr.view()
+        if self.workout and self.workout.clips:
+            # 跟练动画：片段之间（准备、休息喝完水、等下一下）就是平时的正面图，片段首尾帧和它严丝合缝
+            d = self.workout.clips
+            if not d.player.active or d.player.blend() < 1:
+                # 片段之间、片段开头结尾叠化时垫着的正面图：不摇不晃，只轻轻呼吸（脚底不动），和首尾帧对得上
+                pix = self.sprites[("正面", self.cur_h)]
+                pw, ph = pix_size(pix)
+                ph *= 1 + 0.01 * math.sin(now * 2.5)
+                p.drawPixmap(QRectF(cx - pw / 2, bottom - ph, pw, ph), pix, QRectF(pix.rect()))
+            if d.player.active:
+                d.player.draw(p, cx, bottom, self.cur_h, mirror=d.mirror)
+            workout.draw_fx(p, self.workout.fx(), now, cx, bottom - self.cur_h, self.cur_h)
+            if self.workout.show_timer:
+                self._paint_countdown(p, cx + 0.44 * self.cur_h, bottom - 0.93 * self.cur_h)
+            if self.bubble_text and now < self.bubble_until:
+                self._paint_bubble(p, cx, max(4.0, self.head_room - BUBBLE_H + 4))
+            return
         if self.workout:
             self._paint_workout(p, cx, bottom, now)
             if self.bubble_text and now < self.bubble_until:
@@ -705,6 +724,7 @@ class PetWindow(QWidget):
         self.update()
 
     def _tick_workout(self):
+        had_clips = self.workout.clips is not None
         for ev in self.workout.update(TICK / 1000.0):
             if ev[0] == "say":
                 self.last_line = ""
@@ -715,6 +735,8 @@ class PetWindow(QWidget):
                 self.announcer.speak(ev[1])
         if self.workout.done:
             self.stop_workout(finished=True)
+        elif had_clips and self.workout.clips is None:   # 跟练动画放不了，退回姿势帧：窗口按姿势帧重排
+            self._relayout()
 
     # ---------- 跟练 ----------
     def start_workout(self, plan, prep=True):
@@ -728,7 +750,8 @@ class PetWindow(QWidget):
         self.target = None
         self._set_dir("down", 1)
         self.cross_t = 0.0
-        self.workout = WorkoutPlayer(plan, rounds or None, prep=prep, slack=self.cfg.get("workout_slack", True))
+        self.workout = WorkoutPlayer(plan, rounds or None, prep=prep, slack=self.cfg.get("workout_slack", True),
+                                     use_clips=True)
         self.announcer.voice = self.cfg.get("workout_voice", True) and prep
         self._relayout()
 

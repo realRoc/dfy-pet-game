@@ -1,9 +1,12 @@
 """健身跟练：大肥鱼按训练计划带你练，报下一个动作、倒计时、偶尔偷懒。
 
-三块：
+几块：
+- 跟练动画（首选）：content/workout/clips/ 里 Seedance 生成的透明视频（怎么来的见 tools/make_workout_clips.py），
+  每段都从正面站姿开始、回到正面站姿；ClipDirector 一段播完再挑下一段，所以动作、偷懒、喘气喝水之间总是
+  中立 → 动作 / 偷懒 → 中立，不会上一秒还在偷懒下一秒就在练。
 - 原子动作 MOVES：每个动作是一条关键帧时间轴（Key），姿势帧在 content/workout/frames/（怎么来的见
   tools/make_workout_frames.py），按各自的停留时长循环，再叠蓄力、残影、落定余震、呼吸发抖这些小动作和头顶符号。另有累了、瘫倒、偷懒、喝水、欢呼这些
-  大肥鱼人设动作，跟练时自己会用上，也能写进训练计划里。
+  大肥鱼人设动作，跟练时自己会用上，也能写进训练计划里。没装 PyAV 或跟练动画缺失时用这一套画。
 - 训练计划：JSON，内置的放 content/workout/plans/，自己写的放 workouts/（右键「跟练 → 打开计划文件夹」）。
   展开成一条时间线：准备 → 动作 → 休息 → 动作 …，多轮之间有轮间休息。
 - WorkoutPlayer：沿时间线走，告诉桌宠现在画哪张帧、该说什么、该响什么提示音。不碰界面，方便测。
@@ -19,10 +22,13 @@ from collections import namedtuple
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QPixmap
 
+import clips as clip_lib
 from common import APP_DIR, BUNDLE_DIR, IS_MAC, IS_WIN, emoji_font
 
 WORKOUT_DIR = os.path.join(BUNDLE_DIR, "content", "workout")
 FRAME_DIR = os.path.join(WORKOUT_DIR, "frames")
+CLIP_DIR = os.path.join(WORKOUT_DIR, "clips")
+CLIP_FADE = 0.15   # 片段开头结尾和正面图叠化几秒：视频比原画软一点，硬切会闪一下；左边的镜像也靠它带过去
 BUILTIN_PLAN_DIR = os.path.join(WORKOUT_DIR, "plans")
 USER_PLAN_DIR = os.path.join(APP_DIR, "workouts")
 
@@ -187,6 +193,40 @@ MOVES = {
 SIDE_LABEL = {"left": "左", "right": "右"}
 
 SLACK_LINES = ["就偷懒一下下……", "主人没在看吧……", "先干口饭再说", "摸鱼，鱼的本能"]   # 心声，气泡自己会加括号
+
+# ---------- 跟练动画 ----------
+# 躺着 / 蹲着练的姿势：(进入那段, 起身那段)。进入那段从站姿到这个姿势，起身那段回到站姿
+POSTURES = {"bridge": ("bridge_enter", "bridge_exit"), "wall": ("wall_sit_enter", "wall_sit_exit")}
+# 动作 → (要在哪个姿势上练, 循环播的那段)；姿势 None 是站着，循环段 None 是站着不动（画平时的正面图）
+MOVE_CLIPS = {
+    "squat_open_close": (None, "squat_open_close"),
+    "squat": (None, "squat"),
+    "curtsy_lunge": (None, "curtsy_lunge"),
+    "lunge": (None, "lunge"),
+    "deadlift": (None, "deadlift"),
+    "glute_bridge": ("bridge", "bridge_loop"),
+    "glute_bridge_single": ("bridge", "bridge_single_loop"),
+    "wall_sit": ("wall", "wall_sit_loop"),
+    "stand": (None, None),
+    "tired": (None, "tired"),
+    "collapse": (None, "collapse"),
+    "slack": (None, "lazy_rice"),
+    "lazy_squat": (None, "lazy_fake"),
+    "drink": (None, "drink"),
+    "cheer": (None, "cheer"),
+}
+# 偷懒的片段：(开始偷懒时的心声, 被发现时说的话, 第几秒被发现)。每段都是 中立 → 偷懒 → 被发现 → 中立
+LAZY = {
+    "lazy_doze": ("眼皮好重……就眯一下", "没睡！我没睡！", 3.5),
+    "lazy_phone": ("就看一眼消息……", "我在查动作要领！", 4.0),
+    "lazy_rice": ("先干口饭再说", "吃饱了才有力气练！", 4.5),
+    "lazy_think": ("让我深度思考一下……", "已思考 3 秒，继续练！", 4.2),
+    "lazy_flop": ("躺平，鱼的本能", "被发现了！继续继续！", 4.2),
+    "lazy_fish": ("偷吃一口小鱼干……", "没吃！嘴里什么都没有！", 4.2),
+    "lazy_fake": ("我在练，我在练……", "这次认真练！", 4.2),
+    "lazy_tailnap": ("抱着尾巴睡一会儿……", "我醒着！我醒着！", 4.8),
+}
+CLIP_SLACK_CHANCE = 0.55   # 20 秒以上的站着练的动作，有多大概率中途偷懒一次
 CAUGHT_LINES = ["被发现了！继续继续！", "我没偷懒！我在思考！", "已思考 3 秒，继续练！"]
 LAST_LINES = ["最后 10 秒！", "坚持住！快到了！", "腿在抖了！别停！"]
 REST_LINES = ["休息 {s} 秒，下一个：{next}", "喘口气，下一个：{next}"]
@@ -311,7 +351,7 @@ def manifest():
 
 def available():
     frames = manifest()["frames"]
-    return bool(frames) and all(m.frames <= frames.keys() for m in MOVES.values())
+    return clip_library() is not None or (bool(frames) and all(m.frames <= frames.keys() for m in MOVES.values()))
 
 
 class FrameCache:
@@ -392,12 +432,104 @@ def animate(move, t, mirror=False):
     return Pose(layers, ghosts, (dx, dy, rot, sx, sy), move.fx)
 
 
+# ---------- 跟练动画 ----------
+_CLIP_LIB = False   # False：还没读过；None：不可用
+
+
+def clip_library():
+    """跟练动画素材；没装 PyAV、素材缺失或缺了要用的段时返回 None（退回姿势帧那套）。"""
+    global _CLIP_LIB
+    if _CLIP_LIB is False:
+        lib = clip_lib.load_library(CLIP_DIR, CLIP_FADE)
+        if lib is not None:
+            need = {c for c, _ in POSTURES.values()} | {c for _, c in POSTURES.values()} | set(LAZY)
+            need |= {c for _, c in MOVE_CLIPS.values() if c}
+            missing = sorted(need - lib.clips.keys())
+            if missing:
+                print("跟练动画缺这些段，改用姿势帧:", missing)
+                lib = None
+        _CLIP_LIB = lib
+    return _CLIP_LIB
+
+
+def clip_extents(h):
+    """跟练动画以脚底为原点往左、右、上、下最多伸出多少（逻辑像素），给窗口留地方。镜像也算上。"""
+    lib = clip_library()
+    left = right = up = down = 0.0
+    for info in lib.clips.values():
+        l, r, u, d = clip_lib.clip_extents(lib.ref, info.get("offset", info["crop"][:2]),
+                                           info["crop"][2], info["crop"][3], h)
+        side = max(l, r)
+        left, right, up, down = max(left, side), max(right, side), max(up, u), max(down, d)
+    return left, right, up, down
+
+
+class ClipDirector:
+    """跟练动画的导演。一段播完（这时一定停在正面站姿，或者某个躺着 / 蹲着的姿势上）才挑下一段，
+    所以任何两段都是接上的。挑的顺序：
+    1. 在躺着 / 蹲着的姿势上，但接下来不在这个姿势上练（或者有排着队的站着的片段）：先起身
+    2. 排着队的（休息时先喘气再喝水、暂停时喘气、练完欢呼再瘫倒）
+    3. 要躺下 / 蹲下练：先进入那个姿势
+    4. 要偷懒且站着：播一段偷懒（不和上一次重样）
+    5. 这个动作的循环段；没有就站着（画平时的正面图）"""
+
+    def __init__(self, lib):
+        self.player = clip_lib.ClipPlayer(lib)
+        self.posture = None
+        self.mirror = False
+        self.queue = []
+        self.last_lazy = None
+        self.failed = False   # 素材打不开 / 解码出错：WorkoutPlayer 退回姿势帧
+
+    @property
+    def name(self):
+        return self.player.name
+
+    @property
+    def idle(self):
+        return not self.player.active and not self.queue and self.posture is None
+
+    def update(self, dt, posture, loop, mirror=False, lazy=False):
+        """往前走 dt 秒；正好开始了新的一段时返回它的名字。"""
+        if self.player.active:
+            self.player.update(dt)
+            if self.player.active:
+                return None
+        was = self.posture
+        name, mirror = self._pick(posture, loop, mirror, lazy)
+        if name is None:
+            return None
+        # 只在正面站姿那头和正面图叠化：进入那段只淡入、起身那段只淡出、躺着的循环段都不淡
+        if self.player.start(name, fades=(was is None, self.posture is None)) is None:
+            self.failed = True
+            return None
+        self.mirror = mirror
+        return name
+
+    def _pick(self, posture, loop, mirror, lazy):
+        if self.posture and (self.queue or posture != self.posture):
+            name = POSTURES[self.posture][1]
+            self.posture = None
+            return name, False
+        if self.queue:
+            return self.queue.pop(0), False
+        if posture and self.posture is None:
+            self.posture = posture
+            return POSTURES[posture][0], False
+        if lazy and self.posture is None:
+            name = random.choice([n for n in LAZY if n != self.last_lazy])
+            self.last_lazy = name
+            return name, False
+        # 躺着 / 蹲着的姿势首尾接的是进入那段的最后一帧，翻过来就接不上了，只有站着的动作能镜像
+        return loop, mirror and self.posture is None
+
+
 # ---------- 播放 ----------
 class WorkoutPlayer:
     """沿时间线走。update(dt) 返回这一帧发生的事件，桌宠据此说话、响提示音、报语音：
     ("say", 文本, 是否心声) / ("beep", "tick"|"go"|"rest"|"done") / ("speak", 文本)"""
 
-    def __init__(self, plan, rounds=None, prep=True, slack=True):
+    def __init__(self, plan, rounds=None, prep=True, slack=True, use_clips=False):
         self.plan = plan
         self.segs = build_timeline(plan, rounds, prep)
         self.rounds = rounds or plan["rounds"]
@@ -413,7 +545,10 @@ class WorkoutPlayer:
         self.anim_t = 0.0       # 动画时钟，暂停时也走（暂停时大肥鱼原地喘气）
         self.slack_at = None
         self.slack_t = None
+        self.caught_at = None
         self._pending = []
+        lib = clip_library() if use_clips else None
+        self.clips = ClipDirector(lib) if lib else None   # None：用姿势帧那套
         self._enter()
 
     # --- 查询 ---
@@ -423,6 +558,8 @@ class WorkoutPlayer:
 
     @property
     def done(self):
+        if self.clips:   # 等手上这段播完（练完是欢呼、瘫倒），回到站姿再结束
+            return self.finished and self.clips.idle
         return self.finished and self.finish_t >= FINISH_SECS
 
     @property
@@ -452,6 +589,8 @@ class WorkoutPlayer:
     # --- 控制 ---
     def toggle_pause(self):
         self.paused = not self.paused
+        if self.clips:
+            self.clips.queue = ["tired"] if self.paused else []   # 暂停时弯腰喘口气，然后站着等
         return self.paused
 
     def skip(self):
@@ -477,9 +616,17 @@ class WorkoutPlayer:
 
     def _enter(self):
         s = self.seg
+        if self.clips and self.slacking:
+            self._caught()   # 偷懒的片段还在播：时间到了，算她被发现
         self.slack_t = None
         self.slack_at = None
         m = MOVES[s.move]
+        if self.clips:
+            self.clips.queue = []
+            if s.kind == "rest":
+                # 刚练完先弯腰喘一会儿，再喝水
+                tired = self.idx > 0 and self.segs[self.idx - 1].secs >= 30 and s.secs >= 9
+                self.clips.queue = ["tired", "drink"] if tired else ["drink"]
         nxt = self.next_work()
         if s.kind == "prep":
             first = self.segs[1].label if len(self.segs) > 1 else ""
@@ -487,7 +634,12 @@ class WorkoutPlayer:
         elif s.kind == "work":
             inner = m.cue.startswith("（")   # 括号里的是心声，用灰色气泡（气泡自己加括号）
             self._pending += [("beep", "go"), ("say", m.cue.strip("（）"), inner), ("speak", f"开始，{s.label}")]
-            if self.slack_enabled and m.still and s.secs >= 30 and random.random() < 0.35:
+            if self.clips:
+                posture = MOVE_CLIPS[s.move][0]
+                if self.slack_enabled and not m.persona and posture is None and s.secs >= 20 \
+                        and random.random() < CLIP_SLACK_CHANCE:
+                    self.slack_at = s.secs * random.uniform(0.2, 0.55)
+            elif self.slack_enabled and m.still and s.secs >= 30 and random.random() < 0.35:
                 self.slack_at = s.secs * random.uniform(0.35, 0.65)
         else:
             nl = nxt.label if nxt else "没有了"
@@ -498,6 +650,11 @@ class WorkoutPlayer:
     def _finish(self):
         self.finished, self.finish_t = True, 0.0
         self.idx = len(self.segs) - 1
+        if self.clips:
+            if self.slacking:
+                self._caught()
+            self.slack_t = self.slack_at = None
+            self.clips.queue = ["cheer", "collapse"] if self.celebrate else []
         if not self.celebrate:
             self.finish_t = FINISH_SECS
             return
@@ -506,10 +663,12 @@ class WorkoutPlayer:
 
     def update(self, dt):
         self.anim_t += dt
+        if self.clips:
+            self._update_clips(dt)
         if self.finished:
             prev = self.finish_t
             self.finish_t += dt
-            if prev < 3.0 <= self.finish_t:
+            if not self.clips and prev < 3.0 <= self.finish_t:
                 self._pending.append(("say", MOVES["collapse"].cue, False))
             return self._flush()
         if self.paused:
@@ -526,8 +685,10 @@ class WorkoutPlayer:
             self._pending.append(("say", random.choice(LAST_LINES), False))
         if s.kind == "work" and s.secs >= 20 and prev < s.secs / 2 <= self.t and s.side is None:
             self._pending.append(("speak", "一半了"))
-        # 偷懒：中途摆烂几秒，然后「被发现了」
-        if self.slack_at is not None and prev < self.slack_at <= self.t:
+        # 偷懒：中途摆烂几秒，然后「被发现了」。用跟练动画时由 _update_clips 管
+        if self.clips:
+            pass
+        elif self.slack_at is not None and prev < self.slack_at <= self.t:
             self.slack_t = 0.0
             self._pending.append(("say", random.choice(SLACK_LINES), True))
         elif self.slack_t is not None:
@@ -542,6 +703,57 @@ class WorkoutPlayer:
     def _flush(self):
         out, self._pending = self._pending, []
         return out
+
+    def _want(self):
+        """现在想播什么：(姿势, 循环段, 镜像)。"""
+        s = self.seg
+        if self.finished or self.paused or s.kind != "work":
+            return None, None, False
+        posture, loop = MOVE_CLIPS[s.move]
+        return posture, loop, s.side == "left"
+
+    def _update_clips(self, dt):
+        d = self.clips
+        posture, loop, mirror = self._want()
+        lazy = False
+        if self.slack_at is not None and not self.paused and not self.finished and self.t >= self.slack_at:
+            # 到点了：等手上这一下练完（回到站姿）再偷懒；剩的时间不够偷懒一整段就算了
+            if self.seg.secs - self.t >= 9:
+                lazy = True
+            else:
+                self.slack_at = None
+        started = d.update(dt, posture, loop, mirror, lazy)
+        if d.failed:
+            print("跟练动画播放失败，改用姿势帧")
+            self.clips = None
+            self.slack_t = self.slack_at = None
+            return
+        if started in LAZY and lazy:
+            self.slack_at = None
+            self.slack_t = 0.0
+            self.caught_at = LAZY[started][2]
+            self._pending.append(("say", LAZY[started][0], True))
+        elif started == "collapse" and self.finished:
+            self._pending.append(("say", MOVES["collapse"].cue, False))
+        if self.slack_t is not None:
+            self.slack_t += dt
+            if self.caught_at is not None and self.slack_t >= self.caught_at:
+                self._caught()
+            if d.name not in LAZY:
+                self.slack_t = None
+
+    def _caught(self):
+        if self.caught_at is not None:
+            self._pending.append(("say", LAZY[self.clips.last_lazy][1], False))
+        self.caught_at = None
+
+    def fx(self):
+        """用跟练动画时叠的头顶符号：练到最后 10 秒冒汗。"""
+        s = self.seg
+        if not self.finished and not self.paused and s.kind == "work" and s.secs >= 30 \
+                and self.t > s.secs - 10 and not self.slacking:
+            return "sweat"
+        return None
 
     # --- 动画 ---
     def pose(self):
