@@ -4,6 +4,7 @@
 - macOS 适配：鼠标穿透改用 Qt 自带标志，开机自启用 LaunchAgent，字体按平台选
 - 新增「做个表情」「喂食」「说句话」「设置城市」菜单和表情动作（expressions.py）
 - 新增 dsh-pet 的动作动画（舞狮、玩玩具汽车……，clips.py），放进「做个表情」，闲着时也会自己播
+- 新增健身跟练（workout.py）：按训练计划做动作、报下一个、计时，脚下挂计时面板（workout_hud.py）
 - 天气查询改到后台线程，不卡界面
 """
 import math
@@ -27,6 +28,9 @@ from common import (APP_DIR, SPRITE_DIR, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SP
 from expressions import EXPRESSIONS, ExpressionPlayer
 import clips
 from clips import ClipPlayer
+import workout
+from workout import WorkoutPlayer, FrameCache, Announcer
+from workout_hud import WorkoutHUD
 
 try:
     import pynvml
@@ -45,6 +49,7 @@ MARGIN = 4
 SIZE_LEVELS = {"小": 0.55, "中": 0.7, "大": 0.9}
 SPEED = 380.0
 TICK = 20
+ROUND_CHOICES = [("按计划", 0), ("1 轮", 1), ("2 轮", 2), ("3 轮", 3), ("4 轮", 4)]
 
 LINES = [
     "梁白开，更适合国人的大硬鲸模型",
@@ -197,7 +202,8 @@ class FunctionPanel(QFrame):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(2)
 
-        for icon, tip, fn in (("🗨️", "聊天", self._on_chat_clicked), ("🗼", "爬塔", self._on_tower_clicked)):
+        for icon, tip, fn in (("🗨️", "聊天", self._on_chat_clicked), ("🗼", "爬塔", self._on_tower_clicked),
+                              ("🏋️", "跟练", self._on_workout_clicked)):
             b = QPushButton(icon)
             b.setFont(emoji_font(26))
             b.setToolTip(tip)
@@ -205,7 +211,7 @@ class FunctionPanel(QFrame):
             b.clicked.connect(fn)
             layout.addWidget(b)
 
-        self.setFixedSize(122, 60)
+        self.setFixedSize(176, 60)
         self.hide()
 
     def _on_chat_clicked(self):
@@ -217,6 +223,11 @@ class FunctionPanel(QFrame):
         self.hide()
         if self.parent():
             self.parent().open_tower()
+
+    def _on_workout_clicked(self):
+        self.hide()
+        if self.parent():
+            self.parent().show_workout_menu()
 
     def popup_at(self, x, y):
         self.move(int(x), int(y))
@@ -278,6 +289,11 @@ class PetWindow(QWidget):
         self.icon = QIcon(os.path.join(SPRITE_DIR, "icon.png"))
         self.cur_h = int(SPRITE_SRC_H * self.cfg["size"])
         self.clip = ClipPlayer()
+        self.workout = None
+        self.frames = FrameCache()
+        self.announcer = Announcer()
+        self.hud = WorkoutHUD(self.workout_back, self.workout_pause, self.workout_skip, self.stop_workout)
+        self._hud_sig = None
         self._layout_for_size()
 
         # 状态
@@ -344,8 +360,13 @@ class PetWindow(QWidget):
         sprite_w = max(pix_size(p)[0] for k, p in self.sprites.items() if k[1] == self.cur_h)
         self.win_w = int(sprite_w) + self.side * 2
         foot_room = MARGIN + 10
+        ext = None
         if self.clip.active:
-            left, right, up, down = self.clip.extents(self.cur_h)
+            ext = self.clip.extents(self.cur_h)
+        elif self.workout:
+            ext = self.frames.extents(self.workout.frames_in_use(), self.cur_h)
+        if ext:
+            left, right, up, down = ext
             self.win_w = max(self.win_w, int(2 * max(left, right)) + 8)
             self.head_room = max(self.head_room, int(up - self.cur_h) + BUBBLE_H + MARGIN)
             foot_room = max(foot_room, int(down) + MARGIN)
@@ -459,6 +480,11 @@ class PetWindow(QWidget):
 
         cur_key = self._sprite_key()
         view = self.expr.view()
+        if self.workout:
+            self._paint_workout(p, cx, bottom, now)
+            if self.bubble_text and now < self.bubble_until:
+                self._paint_bubble(p, cx, max(4.0, self.head_room - BUBBLE_H + 4))
+            return
         if self.clip.active:
             # 动作动画开头结尾和正面图交叉淡化
             draw_one(cur_key, 1.0 - self.clip.blend())
@@ -475,6 +501,25 @@ class PetWindow(QWidget):
 
         if self.bubble_text and now < self.bubble_until:
             self._paint_bubble(p, cx, max(4.0, self.head_room - BUBBLE_H + 4))
+
+    def _paint_workout(self, p, cx, bottom, now):
+        """跟练时画姿势帧（脚底对齐，交叉淡化），再叠头顶符号。"""
+        layers, (dx, dy, rot, sx, sy), fx = self.workout.pose()
+        h = self.cur_h
+        dpr = self.devicePixelRatioF()
+        top = bottom - h
+        for name, mirror, alpha in layers:
+            pix, ax, ay, w, hh = self.frames.get(name, h, dpr)
+            p.save()
+            p.setOpacity(alpha)
+            p.translate(cx + dx * h, bottom + dy * h)
+            p.rotate(rot)
+            p.scale(sx * (-1 if mirror else 1), sy)
+            p.drawPixmap(QRectF(-ax, -ay, w, hh), pix, QRectF(pix.rect()))
+            p.restore()
+            if alpha >= 0.5:
+                top = bottom + dy * h - ay * sy
+        workout.draw_fx(p, fx, now, cx + dx * h, top, h)
 
     def _paint_bubble(self, p, cx, top):
         if self.bubble_inner:
@@ -549,7 +594,9 @@ class PetWindow(QWidget):
             if not self.clip.active:
                 self._relayout()
                 self.rest_until = self.t * TICK + random.randint(3000, 8000)   # 播完先站一会儿再走
-        busy = self.expr.active or self.clip.active
+        if self.workout:
+            self._tick_workout()
+        busy = self.expr.active or self.clip.active or self.workout is not None
 
         if self.chat_paused or self.dragging or busy:
             if busy:
@@ -607,6 +654,134 @@ class PetWindow(QWidget):
         self.cur_speed += (target_speed - self.cur_speed) * 0.3
         self.update()
 
+    def _tick_workout(self):
+        for ev in self.workout.update(TICK / 1000.0):
+            if ev[0] == "say":
+                self.last_line = ""
+                self.say(ev[1], inner=ev[2])
+            elif ev[0] == "beep":
+                self.announcer.beep(ev[1])
+            elif ev[0] == "speak":
+                self.announcer.speak(ev[1])
+        if self.workout.done:
+            self.stop_workout(finished=True)
+            return
+        self._follow_hud()
+
+    def _follow_hud(self):
+        if not self.hud.isVisible():
+            return
+        geo = (self.screen() or QApplication.primaryScreen()).availableGeometry()
+        foot = self.foot_global()
+        self.hud.follow(QPoint(foot.x(), self.y() + self.height()), self.y() + self.head_room, geo)
+        w = self.workout
+        sig = (w.idx, int(w.remaining), int(w.elapsed), w.paused, w.slacking, w.finished)
+        if sig != self._hud_sig:
+            self._hud_sig = sig
+            self.hud.refresh()
+
+    # ---------- 跟练 ----------
+    def start_workout(self, plan, prep=True):
+        rounds = self.cfg.get("workout_rounds", 0) if prep else 1
+        self.stop_clip()
+        self.expr.stop()
+        self.announcer.stop()
+        self.chat_paused = False
+        self.jump_t = 0
+        self.action = None
+        self.target = None
+        self._set_dir("down", 1)
+        self.cross_t = 0.0
+        self.workout = WorkoutPlayer(plan, rounds or None, prep=prep, slack=self.cfg.get("workout_slack", True))
+        self.announcer.voice = self.cfg.get("workout_voice", True) and prep
+        self._relayout()
+        self._hud_sig = None
+        if prep:
+            self.hud.show_for(self.workout)
+        self._follow_hud()
+
+    def stop_workout(self, finished=False):
+        if self.workout is None:
+            return
+        self.workout = None
+        self.announcer.stop()
+        self.hud.hide()
+        self._relayout()
+        self.rest_until = self.t * TICK + random.randint(6000, 12000)
+        if not finished:
+            self.last_line = ""
+            self.say("不练啦？下次继续～")
+
+    def workout_pause(self):
+        if self.workout:
+            paused = self.workout.toggle_pause()
+            self.say("偷偷喘口气" if paused else "继续！", inner=paused)
+            self.announcer.speak("暂停" if paused else "继续")
+            self._hud_sig = None
+
+    def workout_skip(self):
+        if self.workout:
+            self.workout.skip()
+            self._hud_sig = None
+
+    def workout_back(self):
+        if self.workout:
+            self.workout.back()
+            self._hud_sig = None
+
+    def preview_move(self, key):
+        self.start_workout(workout.single_move_plan(key), prep=False)
+
+    def _add_workout_menu(self, m):
+        wm = m.addMenu("🏋️ 跟练")
+        if self.workout:
+            wm.addAction("⏯ 暂停 / 继续", self.workout_pause)
+            wm.addAction("⏭ 跳过这段", self.workout_skip)
+            wm.addAction("✕ 结束跟练", self.stop_workout)
+            wm.addSeparator()
+        if not workout.available():
+            wm.addAction("跟练素材缺失（content/workout/frames）").setEnabled(False)
+            return wm
+        plans, errors = workout.load_plans()
+        for pid, plan in plans:
+            total = sum(s.secs for s in workout.build_timeline(plan, self.cfg.get("workout_rounds", 0) or None))
+            wm.addAction(f"{plan['name']} · {workout.fmt_secs(total)}",
+                         lambda _checked=False, pl=plan: self.start_workout(pl))
+        for err in errors:
+            wm.addAction(f"⚠️ {err}"[:60]).setEnabled(False)
+        wm.addSeparator()
+        rm = wm.addMenu("轮数")
+        for label, n in ROUND_CHOICES:
+            a = rm.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(self.cfg.get("workout_rounds", 0) == n)
+            a.triggered.connect(lambda _checked=False, v=n: self.cfg.__setitem__("workout_rounds", v))
+        pm = wm.addMenu("动作预览")
+        moves = [(k, mv) for k, mv in workout.MOVES.items() if k != "stand"]
+        for persona in (False, True):
+            if persona:
+                pm.addSeparator()   # 下面是大肥鱼的人设动作
+            for key, mv in moves:
+                if mv.persona == persona:
+                    pm.addAction(mv.label, lambda _checked=False, k=key: self.preview_move(k))
+        for label, key, default in (("语音播报", "workout_voice", True), ("大肥鱼会偷懒", "workout_slack", True)):
+            a = wm.addAction(label)
+            a.setCheckable(True)
+            a.setChecked(self.cfg.get(key, default))
+            a.triggered.connect(lambda on, k=key: self.cfg.__setitem__(k, bool(on)))
+        wm.addAction("打开计划文件夹…", self.open_plan_dir)
+        return wm
+
+    def show_workout_menu(self):
+        m = QMenu(self)
+        self._add_workout_menu(m)
+        m.actions()[0].menu().exec(self.cursor().pos())
+
+    def open_plan_dir(self):
+        path = workout.ensure_user_plan_dir()
+        if not QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
+            self.say(f"计划放在 {path}")
+
     def _maybe_idle_action(self):
         if random.random() < 0.01:
             pick = random.random()
@@ -643,7 +818,16 @@ class PetWindow(QWidget):
         self.bubble_until = self.t * TICK / 1000.0 + 2.8
         self.update()
 
+    def _busy_training(self):
+        if self.workout:
+            self.last_line = ""
+            self.say("在练呢！练完再玩～")
+            return True
+        return False
+
     def play_expression(self, key=None):
+        if self._busy_training():
+            return
         self.stop_clip()
         self.chat_paused = False
         self.jump_t = 0
@@ -654,6 +838,8 @@ class PetWindow(QWidget):
 
     def play_clip(self, name=None):
         """播一段动作动画（不传则随机），返回播没播起来。"""
+        if self._busy_training():
+            return False
         self.expr.stop()
         self.chat_paused = False
         self.jump_t = 0
@@ -766,6 +952,10 @@ class PetWindow(QWidget):
 
     def on_food(self, food):
         self.food_panel.hide()
+        if self.workout:
+            self.last_line = ""
+            self.say("练完再吃！……就一口？")
+            return
         self.stop_clip()
         self._set_dir("down", 1)
         self.expr.start_eat(food)
@@ -818,6 +1008,7 @@ class PetWindow(QWidget):
     def _build_menu(self):
         m = QMenu(self)
         m.addAction("🗼 爬塔", self.open_tower)
+        self._add_workout_menu(m)
         m.addSeparator()
         expr_menu = m.addMenu("做个表情")
         expr_menu.addAction("随机", self.play_random)
@@ -878,6 +1069,15 @@ class PetWindow(QWidget):
         if ok and city.strip():
             self.cfg["city"] = city.strip()
             self.say(f"城市已设置为{city.strip()}")
+
+    def hideEvent(self, e):
+        self.hud.hide()
+        super().hideEvent(e)
+
+    def showEvent(self, e):
+        if self.workout and self.workout.segs[0].kind == "prep":
+            self.hud.show_for(self.workout)
+        super().showEvent(e)
 
     def contextMenuEvent(self, e):
         self.chat_paused = False

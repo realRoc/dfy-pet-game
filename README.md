@@ -2,7 +2,7 @@
 
 给 DeepSeek 二创形象「鲸鱼娘·大肥鱼」做的**桌面宠物**，外加一个独立的网页爬塔游戏。
 
-- **桌宠**（仓库根目录，Python + PySide6）：在桌面上散步、互动、做表情、播动作动画
+- **桌宠**（仓库根目录，Python + PySide6）：在桌面上散步、互动、做表情、播动作动画，还能带你健身跟练
 - **爬塔**（[`tower/`](tower/README.md)，网页游戏）：仿《杀戮尖塔》的像素卡牌 roguelike，15 层地图选路打到关底 Boss。桌宠单击面板里的 🗼 或右键「🗼 爬塔」直接在浏览器里打开
 
 ### 爬塔宣传视频
@@ -19,7 +19,7 @@
 保留了 [dafeiyu-pet](https://github.com/1190fasheqi/dafeiyu-pet) 的全部功能：
 
 - **三视图行走**：自由散步 / 跟随鼠标 / 原地待着；左右走用侧面（自动镜像），向上背面、向下正面
-- **互动**：拖拽（会侧身朝拖动方向）；单击蹦一下、回嘴，并弹出功能面板（🗨️ 聊天、🗼 爬塔）；双击喂食（小鱼干 / 蛋糕 / 棒棒糖 / 团子 / 钻石）
+- **互动**：拖拽（会侧身朝拖动方向）；单击蹦一下、回嘴，并弹出功能面板（🗨️ 聊天、🗼 爬塔、🏋️ 跟练）；双击喂食（小鱼干 / 蛋糕 / 棒棒糖 / 团子 / 钻石）
 - **台词**：日常台词、互动回嘴、思维链心声（灰色斜体括号气泡）
 - **AI 对话**：调用 DeepSeek API，Key 在右键「设置 Key」里填，存在本地 `config.json`
 - **天气**：右键「查看天气」，城市在「设置城市」里改
@@ -32,6 +32,7 @@
 - **动作动画**：搬来了 [dsh-pet](https://github.com/PC2005-cloud/dsh-pet) 的 92 段透明动画（舞狮头、玩玩具汽车、玩魔方、涮火锅、放烟花、撸猫……），
   在「做个表情」里按 小动作 / 互动 / 玩耍 / 吃什么 / 时节 / 文字 分类挑；闲着时也会自己随机播一段（每段 10 秒，拖一下就停）
 - 右键菜单补上了「喂食」「说句话」「设置城市」
+- **健身跟练**：右键「🏋️ 跟练」或单击面板的 🏋️，见下面
 
 ### 表情
 
@@ -49,6 +50,22 @@ dsh-pet 的动画是同一个大肥鱼形象的完整视频（640×360、24 帧�
 播的时候人物按待机动画的身高缩放到桌宠大小、脚底对齐，开头结尾和正面图淡入淡出；
 吹气球、放风筝这类比人宽的，桌宠窗口会临时撑大，播完缩回来。
 用 [PyAV](https://github.com/PyAV-Org/PyAV) 边播边解码（自带 libvpx，不用另装 ffmpeg），没装 PyAV 时这些动作不出现，其他功能照常。
+
+### 健身跟练
+
+大肥鱼按训练计划带你练：每个动作她都会做给你看，脚下挂一个计时面板（当前动作、倒计时、下一个动作、全程进度，
+可以重来 / 暂停 / 跳过），最后 3 秒滴答提示，macOS 上还会语音报「开始，弓步蹲」「休息 15 秒，下一个，硬拉」。
+
+- 内置 Kris（THENX）的 [6 分钟腿部训练（不跳）](https://www.bilibili.com/video/BV17Z4y1M7YV/)：开合深蹲 → 屈膝礼弓步（左右各 22 秒）→
+  弓步蹲 → 硬拉 → 臀桥（双腿、右、左各 15 秒）→ 靠墙静蹲，动作 45 秒、休息 15 秒，菜单「轮数」可以连练几轮
+- 动作是原子化的，可以自己编排：在 `workouts/` 里写 JSON（菜单「打开计划文件夹…」有示例），格式和可用动作见
+  [`content/workout/README.md`](content/workout/README.md)；「动作预览」能单独看每个动作
+- 她有自己的人设动作：休息时先喘气再喝水，最后 10 秒冒汗发抖，偶尔偷懒刷手机、干一碗白饭然后「被发现了！」，练完欢呼再瘫倒
+
+![跟练](docs/workout.png)
+
+姿势帧是用 ChatGPT 的图片生成照着精灵图画的（提示词和流程见 [`content/workout/README.md`](content/workout/README.md)），
+同样适用 CC BY-NC-SA 4.0。
 
 ## 运行
 
@@ -93,6 +110,11 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 | `pet.py` | 桌宠本体（移植自 dafeiyu-pet 的 `桌宠.py`） |
 | `expressions.py` | 表情动作 |
 | `clips.py` | 动作动画播放器（PyAV 解码透明 webm） |
+| `workout.py` | 健身跟练：原子动作、训练计划、计时和大肥鱼的人设动作 |
+| `workout_hud.py` | 跟练时脚下的计时面板 |
+| `content/workout/` | 跟练的姿势帧（`frames/`）和内置训练计划（`plans/`） |
+| `tools/make_workout_frames.py` | 把生成的姿势原图裁边、统一大小、算脚底锚点，写进 `content/workout/frames/` |
+| `workouts/` | 自己写的训练计划（不进 git） |
 | `content/clips/` | dsh-pet 的动作动画 webm 和 `clips.json`（分类、人物外框） |
 | `tools/import_clips.py` | 从 dsh-pet 的 `assets/webm` 导入动作动画，算人物外框、写 `clips.json` |
 | `common.py` | 路径、平台差异（字体、窗口标志）、配置、精灵加载 |
@@ -122,3 +144,4 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 
 本项目代码采用 [MIT](LICENSE) 协议；`sprites/` 目录和移植自 dafeiyu-pet 的代码同时沿用上游的 MIT 许可，并受上面的角色形象说明约束。
 `content/clips/*.webm` 的动作动画**不在 MIT 范围内**：沿用 dsh-pet 的素材条款（开源可用、禁止商用），角色形象适用 CC BY-NC-SA 4.0，见 [`content/clips/LICENSE.md`](content/clips/LICENSE.md)。
+`content/workout/frames/` 的跟练姿势帧同样**不在 MIT 范围内**，是角色形象的衍生图，适用 CC BY-NC-SA 4.0，见 [`content/workout/README.md`](content/workout/README.md)。
