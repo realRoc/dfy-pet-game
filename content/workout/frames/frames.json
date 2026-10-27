@@ -1,0 +1,165 @@
+{
+ "unit": 560,
+ "frames": {
+  "stand": {
+   "file": "stand.png",
+   "w": 421,
+   "h": 560,
+   "ax": 210.5,
+   "ay": 559.224376731302,
+   "unit": 560
+  },
+  "squat_wide": {
+   "file": "squat_wide.png",
+   "w": 549,
+   "h": 470,
+   "ax": 274.5,
+   "ay": 469.1666961913198,
+   "unit": 560
+  },
+  "squat_narrow": {
+   "file": "squat_narrow.png",
+   "w": 394,
+   "h": 487,
+   "ax": 197.0,
+   "ay": 486.2646037735849,
+   "unit": 560
+  },
+  "squat_wide_half": {
+   "file": "squat_wide_half.png",
+   "w": 549,
+   "h": 470,
+   "ax": 274.5,
+   "ay": 469.17328646748683,
+   "unit": 560
+  },
+  "squat_narrow_half": {
+   "file": "squat_narrow_half.png",
+   "w": 402,
+   "h": 532,
+   "ax": 201.0,
+   "ay": 531.259568545581,
+   "unit": 560
+  },
+  "curtsy": {
+   "file": "curtsy.png",
+   "w": 490,
+   "h": 515,
+   "ax": 245.0,
+   "ay": 514.1924764890282,
+   "unit": 560
+  },
+  "lunge": {
+   "file": "lunge.png",
+   "w": 474,
+   "h": 470,
+   "ax": 237.0,
+   "ay": 469.19313893653515,
+   "unit": 560
+  },
+  "lunge_half": {
+   "file": "lunge_half.png",
+   "w": 471,
+   "h": 459,
+   "ax": 235.5,
+   "ay": 458.1703703703704,
+   "unit": 560
+  },
+  "lift": {
+   "file": "lift.png",
+   "w": 368,
+   "h": 543,
+   "ax": 165.6,
+   "ay": 542.141185770751,
+   "unit": 560
+  },
+  "hinge": {
+   "file": "hinge.png",
+   "w": 496,
+   "h": 493,
+   "ax": 198.4,
+   "ay": 492.191468416735,
+   "unit": 560
+  },
+  "bridge_down": {
+   "file": "bridge_down.png",
+   "w": 534,
+   "h": 314,
+   "ax": 267.0,
+   "ay": 313.2840182648402,
+   "unit": 560
+  },
+  "bridge_up": {
+   "file": "bridge_up.png",
+   "w": 539,
+   "h": 263,
+   "ax": 269.5,
+   "ay": 262.27493112947656,
+   "unit": 560
+  },
+  "bridge_single": {
+   "file": "bridge_single.png",
+   "w": 589,
+   "h": 308,
+   "ax": 294.5,
+   "ay": 307.2102564102564,
+   "unit": 560
+  },
+  "wall_sit": {
+   "file": "wall_sit.png",
+   "w": 313,
+   "h": 560,
+   "ax": 156.5,
+   "ay": 559.2205984690327,
+   "unit": 560
+  },
+  "tired": {
+   "file": "tired.png",
+   "w": 397,
+   "h": 504,
+   "ax": 198.5,
+   "ay": 503.26797385620915,
+   "unit": 560
+  },
+  "collapse": {
+   "file": "collapse.png",
+   "w": 551,
+   "h": 280,
+   "ax": 275.5,
+   "ay": 279.2513368983957,
+   "unit": 560
+  },
+  "slack": {
+   "file": "slack.png",
+   "w": 442,
+   "h": 482,
+   "ax": 221.0,
+   "ay": 481.2573631457209,
+   "unit": 560
+  },
+  "lazy_squat": {
+   "file": "lazy_squat.png",
+   "w": 442,
+   "h": 549,
+   "ax": 221.0,
+   "ay": 548.1716226415094,
+   "unit": 560
+  },
+  "drink": {
+   "file": "drink.png",
+   "w": 434,
+   "h": 543,
+   "ax": 217.0,
+   "ay": 542.1196110210697,
+   "unit": 560
+  },
+  "cheer": {
+   "file": "cheer.png",
+   "w": 434,
+   "h": 560,
+   "ax": 217.0,
+   "ay": 559.1889934829834,
+   "unit": 560
+  }
+ }
+}

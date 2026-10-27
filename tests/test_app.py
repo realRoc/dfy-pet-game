@@ -43,12 +43,12 @@ class PetAppSmokeTest(unittest.TestCase):
         self.assertIn("退出", texts)
         self.assertFalse(any("飞行棋" in t for t in texts), texts)
 
-    def test_single_click_panel_has_chat_and_tower(self):
+    def test_single_click_panel_has_chat_tower_workout(self):
         pet = self.app.pet
         pet._on_single_click()
         self.assertTrue(pet.function_panel.isVisible())
         buttons = pet.function_panel.findChildren(QPushButton)
-        self.assertEqual([b.toolTip() for b in buttons], ["聊天", "爬塔"])
+        self.assertEqual([b.toolTip() for b in buttons], ["聊天", "爬塔", "跟练"])
 
     def test_topmost_and_toggle_visible(self):
         pet = self.app.pet

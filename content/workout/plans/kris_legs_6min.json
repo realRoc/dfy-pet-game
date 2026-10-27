@@ -1,0 +1,18 @@
+{
+  "name": "Kris 6 分钟腿部（不跳）",
+  "source": "https://www.bilibili.com/video/BV17Z4y1M7YV/ （THENX，原片 https://youtu.be/lQOSLBCNDF4）",
+  "rest": 15,
+  "round_rest": 45,
+  "rounds": 1,
+  "steps": [
+    {"move": "squat_open_close", "secs": 45},
+    {"move": "curtsy_lunge", "secs": 22, "side": "right", "rest": 0},
+    {"move": "curtsy_lunge", "secs": 22, "side": "left"},
+    {"move": "lunge", "secs": 45},
+    {"move": "deadlift", "secs": 45},
+    {"move": "glute_bridge", "secs": 15, "rest": 0},
+    {"move": "glute_bridge_single", "secs": 15, "side": "right", "rest": 0},
+    {"move": "glute_bridge_single", "secs": 15, "side": "left"},
+    {"move": "wall_sit", "secs": 45}
+  ]
+}
