@@ -10,6 +10,7 @@ from unittest import mock
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
+    from PySide6.QtCore import QTimer
     from PySide6.QtWidgets import QApplication
     import common
     import workout
@@ -372,6 +373,20 @@ class PetWorkoutTest(_PetBase):
     def test_menu_has_workout(self):
         texts = [a.text() for a in self.pet._build_menu().actions()]
         self.assertIn("🏋️ 跟练", texts)
+
+    def test_show_workout_menu(self):
+        """气泡上点「跟练」直接弹出跟练菜单；PySide6 6.10 上子菜单包装会提前失效，这里要能弹出来。"""
+        shown = []
+
+        def grab_and_close():   # 菜单真的弹出来了：记下菜单项再关掉（6.10 上 patch QMenu.exec 不生效）
+            m = QApplication.activePopupWidget()
+            if m is not None:
+                shown.append([a.text() for a in m.actions()])
+                m.close()
+
+        QTimer.singleShot(0, grab_and_close)
+        self.pet.show_workout_menu()
+        self.assertTrue(shown and shown[0], shown)
 
     def test_full_workout_in_pet(self):
         pet = self.pet

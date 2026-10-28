@@ -853,8 +853,8 @@ class PetWindow(QWidget):
 
     def show_workout_menu(self):
         m = QMenu(self)
-        self._add_workout_menu(m)
-        m.actions()[0].menu().exec(self.cursor().pos())
+        # 不能写 m.actions()[0].menu()：PySide6 6.10 里 QAction 的包装一回收，menu() 拿到的子菜单包装就失效了
+        self._add_workout_menu(m).exec(self.cursor().pos())
 
     def open_plan_dir(self):
         path = workout.ensure_user_plan_dir()

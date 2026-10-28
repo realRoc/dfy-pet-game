@@ -193,8 +193,9 @@ class PetWaterFlowTest(unittest.TestCase):
 
     def test_menu_has_water_entries(self):
         menu = self.pet._build_menu()
-        wm = next(a.menu() for a in menu.actions() if a.text() == "💧 喝水提醒")
-        texts = [a.text() for a in wm.actions()]
+        # 先拿住 QAction：PySide6 6.10 里它的包装一回收，menu() 拿到的子菜单包装就失效了
+        act = next(a for a in menu.actions() if a.text() == "💧 喝水提醒")
+        texts = [a.text() for a in act.menu().actions()]
         self.assertTrue(any(t.startswith("我喝了") for t in texts), texts)
         self.assertIn("预览", texts)
 
