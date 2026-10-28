@@ -855,6 +855,7 @@ class PetWindow(QWidget):
         m = QMenu(self)
         # 不能写 m.actions()[0].menu()：PySide6 6.10 里 QAction 的包装一回收，menu() 拿到的子菜单包装就失效了
         self._add_workout_menu(m).exec(self.cursor().pos())
+        m.deleteLater()   # 挂在桌宠窗口下，不删就每开一次多一棵
 
     def open_plan_dir(self):
         path = workout.ensure_user_plan_dir()
@@ -1420,7 +1421,10 @@ class PetWindow(QWidget):
 
     def contextMenuEvent(self, e):
         self.chat_paused = False
-        self._build_menu().exec(e.globalPos())
+        m = self._build_menu()
+        m.exec(e.globalPos())
+        # 每次右键都新建一整棵菜单（一百多项、十几个子菜单，约 0.5 MB），挂在桌宠窗口下，不删就越用越大
+        m.deleteLater()
 
     # ---------- 功能 ----------
     def set_mode(self, mode):
