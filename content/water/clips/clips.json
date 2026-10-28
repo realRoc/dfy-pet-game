@@ -1,0 +1,145 @@
+{
+ "source": "Seedance 2.5（seedance-2-5-image-to-video-basic），首尾帧 = sprites/正面.png 贴绿幕；提示词见 tools/make_water_clips.py",
+ "ref": {
+  "h": 540,
+  "cx": 480.0,
+  "foot": 850
+ },
+ "clips": {
+  "water_offer": {
+   "file": "water_offer.webm",
+   "crop": [
+    0,
+    0,
+    560,
+    756
+   ],
+   "offset": [
+    182,
+    186
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "water_offer_b": {
+   "file": "water_offer_b.webm",
+   "crop": [
+    0,
+    0,
+    476,
+    552
+   ],
+   "offset": [
+    236,
+    302
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "water_knock": {
+   "file": "water_knock.webm",
+   "crop": [
+    0,
+    0,
+    660,
+    794
+   ],
+   "offset": [
+    96,
+    90
+   ],
+   "frames": 145,
+   "fps": 24
+  },
+  "water_throw": {
+   "file": "water_throw.webm",
+   "crop": [
+    0,
+    0,
+    960,
+    960
+   ],
+   "offset": [
+    0,
+    0
+   ],
+   "frames": 169,
+   "fps": 24
+  },
+  "water_leave": {
+   "file": "water_leave.webm",
+   "crop": [
+    0,
+    0,
+    708,
+    694
+   ],
+   "offset": [
+    252,
+    162
+   ],
+   "frames": 97,
+   "fps": 24
+  },
+  "water_return_sulk": {
+   "file": "water_return_sulk.webm",
+   "crop": [
+    0,
+    0,
+    468,
+    586
+   ],
+   "offset": [
+    226,
+    292
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "water_return_makeup": {
+   "file": "water_return_makeup.webm",
+   "crop": [
+    0,
+    0,
+    600,
+    710
+   ],
+   "offset": [
+    178,
+    146
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "water_cheers": {
+   "file": "water_cheers.webm",
+   "crop": [
+    0,
+    0,
+    504,
+    688
+   ],
+   "offset": [
+    238,
+    166
+   ],
+   "frames": 121,
+   "fps": 24
+  },
+  "water_offer_b2": {
+   "file": "water_offer_b2.webm",
+   "crop": [
+    0,
+    0,
+    478,
+    666
+   ],
+   "offset": [
+    244,
+    194
+   ],
+   "frames": 121,
+   "fps": 24
+  }
+ }
+}

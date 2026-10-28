@@ -826,7 +826,7 @@ def draw_fx(p, fx, t, head_x, head_y, h):
 class Announcer:
     """提示音和语音播报。macOS 用系统自带的 afplay / say（婷婷），Windows 只有提示音，其他系统不出声。
     都是后台子进程，不卡界面；新的语音会打断还没说完的上一句。"""
-    SOUNDS = {"tick": "Tink", "go": "Glass", "rest": "Pop", "done": "Hero"}
+    SOUNDS = {"tick": "Tink", "go": "Glass", "rest": "Pop", "done": "Hero", "crash": "Basso"}
 
     def __init__(self):
         self.voice = True

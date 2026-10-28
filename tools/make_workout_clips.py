@@ -10,6 +10,9 @@ Key 从环境变量 TEAMOROUTER_API_KEY 读，地址可用 TEAMOROUTER_BASE 改�
 所以每段都从原版站姿开始、回到原版站姿，任意两段首尾相接都不会跳——中立 → 动作 / 表情 → 中立。
 躺着、蹲着练的动作拆成 进入 / 循环 / 起身 三段：进入那段不给尾帧，
 取它的最后一帧当循环段的首尾帧和起身段的首帧（SPECS 里 first / last 写别的段名）。
+首帧 / 尾帧也可以写 "side"：sprites/侧面.png 按同样的大小和位置贴绿幕（朝画面左边），给要转身走开、走回来的片段用。
+
+别的素材（比如喝水提醒，tools/make_water_clips.py）复用这里的生成和抠像，只换 SPECS 和产物目录。
 
 需要本机装有带 libvpx 的 ffmpeg（brew install ffmpeg）。
 """
@@ -27,6 +30,7 @@ from concurrent.futures import ThreadPoolExecutor
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT_DIR = os.path.join(ROOT, "content", "workout", "clips")
 SPRITE = os.path.join(ROOT, "sprites", "正面.png")
+SIDE_SPRITE = os.path.join(ROOT, "sprites", "侧面.png")
 BASE = os.environ.get("TEAMOROUTER_BASE", "https://api.teamorouter.vip/v1")
 MODEL = "seedance-2-5-image-to-video-basic"
 CANVAS = 960          # 中立图边长（1:1）
@@ -47,7 +51,7 @@ COMMON = (
 )
 BACK = "最后一秒回到和首帧完全一样的正面站姿和表情，乖巧站好。"
 
-# 名字: (秒数, 首帧, 尾帧, 动作描述)。首帧 / 尾帧：None = 中立图，"-" = 不给尾帧，其他 = 那一段的最后一帧
+# 名字: (秒数, 首帧, 尾帧, 动作描述)。首帧 / 尾帧：None = 中立图，"side" = 侧面图，"-" = 不给尾帧，其他 = 那一段的最后一帧
 SPECS = {
     # ---------- 站着练 ----------
     "squat": (5, None, None, """动作：可爱的深蹲，做两次。
@@ -191,12 +195,12 @@ def _data_uri(path):
         return "data:image/png;base64," + base64.b64encode(f.read()).decode()
 
 
-def neutral(work):
+def neutral(work, sprite=SPRITE, out_name="neutral.png"):
     """原版正面图放大贴到纯绿幕上，作为所有段的中立首尾帧。"""
-    out = os.path.join(work, "neutral.png")
+    out = os.path.join(work, out_name)
     if not os.path.exists(out):
         subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", f"color=c=0x00FF00:s={CANVAS}x{CANVAS}",
-                        "-i", SPRITE, "-filter_complex",
+                        "-i", sprite, "-filter_complex",
                         f"[1]scale=-1:{SPRITE_H}:flags=lanczos[s];[0][s]overlay=(W-w)/2:H-h-{FOOT_MARGIN}:format=auto",
                         "-frames:v", "1", out], check=True)
     return out
@@ -210,16 +214,30 @@ def last_frame(work, name):
     return out
 
 
-def gen_one(work, name):
+def side(work):
+    """侧面图，和中立图一样大、脚底在同一个位置：三视图的脚底中线都在图片正中。"""
+    return neutral(work, SIDE_SPRITE, "side.png")
+
+
+def still(work, key):
+    """首帧 / 尾帧的图：None 中立图，"side" 侧面图，其他是那一段的最后一帧。"""
+    if key is None:
+        return neutral(work)
+    if key == "side":
+        return side(work)
+    return last_frame(work, key)
+
+
+def gen_one(work, name, specs=SPECS):
     mp4 = os.path.join(work, f"{name}.mp4")
     if os.path.exists(mp4):
         return
-    secs, first, last, action = SPECS[name]
-    first_img = neutral(work) if first is None else last_frame(work, first)
+    secs, first, last, action = specs[name]
+    first_img = still(work, first)
     body = {"model": MODEL, "prompt": COMMON + "\n" + action + ("\n" + BACK if last is None else ""),
             "seconds": str(secs), "resolution": "720p", "audio": False, "image_url": _data_uri(first_img)}
     if last != "-":
-        body["end_image_url"] = _data_uri(neutral(work) if last is None else last_frame(work, last))
+        body["end_image_url"] = _data_uri(still(work, last))
     job_file = os.path.join(work, f"{name}.job")   # 提交过的任务号：中途停掉再跑时接着等，不重复付钱
     if os.path.exists(job_file):
         with open(job_file) as f:
@@ -257,14 +275,14 @@ def gen_one(work, name):
     print(f"{name}: 完成", flush=True)
 
 
-def gen(work, names):
+def gen(work, names, specs=SPECS):
     os.makedirs(work, exist_ok=True)
-    names = names or list(SPECS)
-    unknown = [n for n in names if n not in SPECS]
+    names = names or list(specs)
+    unknown = [n for n in names if n not in specs]
     if unknown:
         sys.exit(f"没有这些动作：{unknown}")
     # 依赖别的段（取它的最后一帧）的，等那段先生成
-    deps = {n: {d for d in SPECS[n][1:3] if d not in (None, "-")} for n in names}
+    deps = {n: {d for d in specs[n][1:3] if d not in (None, "-", "side")} for n in names}
     for n in names:
         for d in deps[n]:
             if d not in names and not os.path.exists(os.path.join(work, f"{d}.mp4")):
@@ -278,7 +296,7 @@ def gen(work, names):
                 if n in done or n in pending or n in failed:
                     continue
                 if all(d in done or os.path.exists(os.path.join(work, f"{d}.mp4")) for d in deps.get(n, ())):
-                    pending[n] = pool.submit(gen_one, work, n)
+                    pending[n] = pool.submit(gen_one, work, n, specs)
             time.sleep(1)
             for n, fut in list(pending.items()):
                 if fut.done():
@@ -322,7 +340,7 @@ def matte_filter():
             f"a='255*clip(({a}-{MATTE_LO})/{0.97 - MATTE_LO},0,1)',format=yuva420p")
 
 
-def key_one(work, name):
+def key_one(work, name, out_dir=OUT_DIR):
     """抠绿幕 → 裁到整段外框 → VP9 + alpha 的 webm。"""
     src = os.path.join(work, f"{name}.mp4")
     keyed = os.path.join(work, f"{name}_keyed.webm")
@@ -334,7 +352,7 @@ def key_one(work, name):
     x1, y1 = min(CANVAS, x + w + PAD), min(CANVAS, y + h + PAD)
     x0, y0 = x0 - x0 % 2, y0 - y0 % 2          # yuv420 要偶数
     w, h = (x1 - x0 + 1) // 2 * 2, (y1 - y0 + 1) // 2 * 2
-    dst = os.path.join(OUT_DIR, f"{name}.webm")
+    dst = os.path.join(out_dir, f"{name}.webm")
     subprocess.run(["ffmpeg", "-v", "error", "-y", "-c:v", "libvpx-vp9", "-i", keyed, "-vf", f"crop={w}:{h}:{x0}:{y0}",
                     "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "30", "-auto-alt-ref", "0",
                     "-row-mt", "1", "-an", dst], check=True)
@@ -343,24 +361,24 @@ def key_one(work, name):
     return {"file": f"{name}.webm", "crop": [0, 0, w, h], "offset": [x0, y0], "frames": frames, "fps": 24}
 
 
-def import_(work):
-    os.makedirs(OUT_DIR, exist_ok=True)
-    names = [n for n in SPECS if os.path.exists(os.path.join(work, f"{n}.mp4"))]
-    missing = [n for n in SPECS if n not in names]
+def import_(work, specs=SPECS, out_dir=OUT_DIR, script="tools/make_workout_clips.py"):
+    os.makedirs(out_dir, exist_ok=True)
+    names = [n for n in specs if os.path.exists(os.path.join(work, f"{n}.mp4"))]
+    missing = [n for n in specs if n not in names]
     if missing:
         print("还没生成，跳过：", missing)
     with ThreadPoolExecutor(max_workers=max(1, (os.cpu_count() or 4) // 2)) as pool:
-        results = dict(zip(names, pool.map(lambda n: key_one(work, n), names)))
+        results = dict(zip(names, pool.map(lambda n: key_one(work, n, out_dir), names)))
     manifest = {
-        "source": f"Seedance 2.5（{MODEL}），首尾帧 = sprites/正面.png 贴绿幕；提示词见 tools/make_workout_clips.py",
+        "source": f"Seedance 2.5（{MODEL}），首尾帧 = sprites/正面.png 贴绿幕；提示词见 {script}",
         # 中立图里 sprites/正面.png 整张图（含留白）的高度、中线、底边：运行时缩放到和桌宠的正面图一样大、
         # 摆在同一个位置，片段的首尾帧就和平时的正面图严丝合缝
         "ref": {"h": SPRITE_H, "cx": CANVAS / 2, "foot": CANVAS - FOOT_MARGIN},
         "clips": {n: results[n] for n in names},
     }
-    with open(os.path.join(OUT_DIR, "clips.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(out_dir, "clips.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=1)
-    total = sum(os.path.getsize(os.path.join(OUT_DIR, r["file"])) for r in results.values())
+    total = sum(os.path.getsize(os.path.join(out_dir, r["file"])) for r in results.values())
     print(f"共 {len(names)} 段，{total / 1048576:.1f} MB")
 
 

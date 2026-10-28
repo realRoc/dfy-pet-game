@@ -24,6 +24,7 @@ EXPRESSIONS = {
     "smug":     ("得意", 2.0, ["我果然是大聪明", "誓死捍卫深度求索！", "大肥鱼坐的住"]),
     "cry":      ("委屈", 2.4, ["呜呜我再也不敢了QAQ", "我搞砸了……"]),
     "love":     ("比心", 2.2, ["最喜欢主人了！", "我和你很聊得来，你简直不像碳基生物"]),
+    "thirsty":  ("口渴", 2.4, ["渴了……一起喝口水吧", "水……给我水……"]),
 }
 EAT_TIME = 1.6
 
@@ -126,6 +127,10 @@ class ExpressionPlayer:
             sy = 1 - 0.02 * abs(math.sin(t * 8))
         elif k == "love":
             dy = -abs(math.sin(t * math.pi * 1.2)) * 0.05 * h
+        elif k == "thirsty":
+            droop = _smooth(t / 0.5) * (1 if u < 0.85 else (1 - u) / 0.15)
+            sy = 1 - 0.035 * droop
+            rot = math.sin(t * 3) * 3 * droop
         elif k == "eat":
             sy = 1 - 0.05 * abs(math.sin(t * 14))
             sx = 1 + 0.02 * abs(math.sin(t * 14))
@@ -191,6 +196,9 @@ class ExpressionPlayer:
             emo("❤️", head_x, head_y - 0.08 * h,
                 0.2 * h * _ease_out_back(min(1.0, t / 0.3)) * (1 + 0.08 * math.sin(t * 8)))
             rising(["💕"], 3, 0.7, 0.3, 0.22, 0.08)
+        elif k == "thirsty":
+            emo("💧", head_x + 0.24 * h, head_y - 0.02 * h + abs(math.sin(t * 3)) * -0.05 * h,
+                0.15 * h * _ease_out_back(min(1.0, t / 0.3)))
         elif k == "eat" and self.food:
             u = t / self.dur
             emo(self.food, head_x + 0.02 * h, head_y + 0.42 * h - abs(math.sin(t * 7)) * 0.04 * h,
