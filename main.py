@@ -18,7 +18,7 @@ class PetApp:
         # 托盘（macOS 是菜单栏图标）：鼠标穿透后从这里解除
         self.tray = QSystemTrayIcon(self.pet.icon, self.pet)
         self.tray.setToolTip(APP_NAME)
-        self.tray.setContextMenu(self.pet._build_menu())
+        self._refresh_tray_menu()
         self.tray.activated.connect(self._on_tray_activated)
         self.tray.show()
 
@@ -33,7 +33,14 @@ class PetApp:
 
     def _on_tray_activated(self, _reason):
         # 菜单里的勾选状态（模式、穿透等）每次打开前刷新
+        self._refresh_tray_menu()
+
+    def _refresh_tray_menu(self):
+        """换一棵新菜单；setContextMenu 不接管旧的，旧的挂在桌宠窗口下，得自己删。"""
+        old = self.tray.contextMenu()
         self.tray.setContextMenu(self.pet._build_menu())
+        if old is not None:
+            old.deleteLater()
 
     def toggle_visible(self):
         if self.pet.isVisible():

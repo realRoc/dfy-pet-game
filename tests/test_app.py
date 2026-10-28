@@ -11,7 +11,9 @@ from unittest import mock
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 try:
-    from PySide6.QtWidgets import QApplication, QPushButton
+    from PySide6.QtCore import QCoreApplication, QEvent, QPoint, QTimer
+    from PySide6.QtGui import QContextMenuEvent
+    from PySide6.QtWidgets import QApplication, QMenu, QPushButton
     import common
     import main
 except ImportError as e:   # 没装 PySide6
@@ -66,6 +68,24 @@ class PetAppSmokeTest(unittest.TestCase):
             saved = json.load(f)
         self.assertEqual((saved["x"], saved["y"]), (self.app.pet.x(), self.app.pet.y()))
         self.assertFalse(any(k.startswith("board_") for k in saved), saved)
+
+    def test_menus_freed_after_use(self):
+        """右键、托盘、跟练菜单每次都新建一棵，用完要删掉，不然挂在桌宠窗口下越积越多。"""
+        pet = self.app.pet
+        flush = lambda: QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        flush()
+        base = len(pet.findChildren(QMenu))
+        # 菜单 exec() 会一直等着点，弹出来就关掉（类上 patch exec 拦不住 PySide 的调用）
+        closer = QTimer()
+        closer.timeout.connect(lambda: (w := QApplication.activePopupWidget()) and w.close())
+        closer.start(0)
+        self.addCleanup(closer.stop)
+        for _ in range(5):
+            self.app._on_tray_activated(None)
+            pet.contextMenuEvent(QContextMenuEvent(QContextMenuEvent.Reason.Mouse, QPoint(1, 1), QPoint(1, 1)))
+            pet.show_workout_menu()
+            flush()
+        self.assertEqual(len(pet.findChildren(QMenu)), base)
 
 
 if __name__ == "__main__":
