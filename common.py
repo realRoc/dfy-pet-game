@@ -36,6 +36,11 @@ DEFAULT_CFG = {
     "y": None,
     "ds_api_key": "",
     "city": "汕头",
+    "water_on": True,        # 喝水提醒，默认开
+    "water_interval": 45,    # 分钟
+    "water_quiet": True,     # 22:00–9:00 不提醒
+    "water_mute": "",        # 「今天别提醒了」的日期
+    "water_cups": {},        # {"date": "2026-10-28", "n": 3}
 }
 
 

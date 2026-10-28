@@ -5,8 +5,10 @@
 - 新增「做个表情」「喂食」「说句话」「设置城市」菜单和表情动作（expressions.py）
 - 新增 dsh-pet 的动作动画（舞狮、玩玩具汽车……，clips.py），放进「做个表情」，闲着时也会自己播
 - 新增健身跟练（workout.py）：按训练计划做动作、报下一个，右上角两位数倒计时（红色练、绿色歇）
+- 新增喝水提醒（water.py）：到点递水壶，不理就一级级加码，最后扔大水砸碎屏幕、气跑，过一会儿再回来
 - 天气查询改到后台线程，不卡界面
 """
+import datetime
 import math
 import os
 import plistlib
@@ -18,18 +20,19 @@ import threading
 import psutil
 import requests
 from PySide6.QtCore import Qt, QTimer, QPoint, QPointF, QRectF, QUrl
-from PySide6.QtGui import QPainter, QFont, QColor, QIcon, QFontMetrics, QPolygonF, QDesktopServices, QPen
+from PySide6.QtGui import QPainter, QFont, QColor, QCursor, QIcon, QFontMetrics, QPolygonF, QDesktopServices, QPen
 from PySide6.QtWidgets import (QApplication, QWidget, QMenu, QSystemTrayIcon, QMessageBox,
                                QInputDialog, QLineEdit, QHBoxLayout, QVBoxLayout, QPushButton,
                                QFrame, QDialog, QToolButton)
 
-from common import (APP_DIR, SPRITE_DIR, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
+from common import (APP_DIR, APP_NAME, SPRITE_DIR, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
                     emoji_font, float_flags, load_sprites, pix_size)
 from expressions import EXPRESSIONS, ExpressionPlayer
 import clips
 from clips import ClipPlayer
 import workout
 from workout import WorkoutPlayer, FrameCache, Announcer
+import water
 
 try:
     import pynvml
@@ -291,6 +294,21 @@ class PetWindow(QWidget):
         self.workout = None
         self.frames = FrameCache()
         self.announcer = Announcer()
+        self.clip_mirror = False
+        # 喝水提醒
+        self.water = water.WaterReminder(self.cfg)
+        self.water_walk = None        # {"to": (窗口中心 x, y), "speed": 倍数, "then": 走到了做什么}
+        self.water_fx = None          # 头顶符号：气跑路上的 💢
+        self.shatter = None           # 碎屏特效窗口
+        self._water_next = None       # 这段片段 / 表情演完接着做什么
+        self._water_throw_at = None   # 片段播到第几秒水瓶出手
+        self._water_home = None       # 气跑前站的位置（脚底），回来走回这里
+        self._water_edge = 1          # 往哪边跑：1 右、-1 左
+        self._water_preview = False
+        self._water_acc = 0.0
+        self._water_idle = 0.0
+        self._water_idle_left = 0.0
+        self._last_offer = None
         self._layout_for_size()
 
         # 状态
@@ -504,7 +522,7 @@ class PetWindow(QWidget):
         if self.clip.active:
             # 动作动画开头结尾和正面图交叉淡化
             draw_one(cur_key, 1.0 - self.clip.blend())
-            self.clip.draw(p, cx, bottom, self.cur_h)
+            self.clip.draw(p, cx, bottom, self.cur_h, mirror=self.clip_mirror)
         elif view:
             draw_one((view[0], self.cur_h, view[1]), 1.0)
         elif self.cross_t > 0:
@@ -514,6 +532,8 @@ class PetWindow(QWidget):
             draw_one(cur_key, 1.0)
 
         self.expr.draw_overlay(p, cx + ex, bottom - self.cur_h + ey + jump + bob, self.cur_h)
+        water.draw_fx(p, self.water_fx or ("cold" if self.water.cold > 0 else None), now,
+                      cx + ex, bottom - self.cur_h + ey + jump + bob, self.cur_h)
 
         if self.bubble_text and now < self.bubble_until:
             self._paint_bubble(p, cx, max(4.0, self.head_room - BUBBLE_H + 4))
@@ -638,6 +658,8 @@ class PetWindow(QWidget):
     # ---------- 逻辑 ----------
     def tick(self):
         if not self.isVisible():
+            if self.water.phase == "away":   # 气跑了：窗口藏起来，喝水提醒照样计时，到点了走回来
+                self._tick_water()
             return
         self.t += 1
 
@@ -665,7 +687,12 @@ class PetWindow(QWidget):
                 self.rest_until = self.t * TICK + random.randint(3000, 8000)   # 播完先站一会儿再走
         if self.workout:
             self._tick_workout()
-        busy = self.expr.active or self.clip.active or self.workout is not None
+        self._tick_water()
+        if self.water_walk and not self.dragging:
+            self._step_water_walk()
+            self.update()
+            return
+        busy = self.expr.active or self.clip.active or self.workout is not None or self._water_next is not None
 
         if self.chat_paused or self.dragging or busy:
             if busy:
@@ -826,13 +853,267 @@ class PetWindow(QWidget):
 
     def show_workout_menu(self):
         m = QMenu(self)
-        self._add_workout_menu(m)
-        m.actions()[0].menu().exec(self.cursor().pos())
+        # 不能写 m.actions()[0].menu()：PySide6 6.10 里 QAction 的包装一回收，menu() 拿到的子菜单包装就失效了
+        self._add_workout_menu(m).exec(self.cursor().pos())
 
     def open_plan_dir(self):
         path = workout.ensure_user_plan_dir()
         if not QDesktopServices.openUrl(QUrl.fromLocalFile(path)):
             self.say(f"计划放在 {path}")
+
+    # ---------- 喝水提醒 ----------
+    def _tick_water(self):
+        """每一帧：水瓶到点出手、片段演完接下一步；每秒推一下 WaterReminder，人在不在每 5 秒问一次系统。"""
+        if self._water_throw_at is not None:
+            prog = self.clip.t if self.clip.active else (self.expr.t if self.expr.active else math.inf)
+            if prog >= self._water_throw_at:
+                self._water_throw_at = None
+                self._water_shatter()
+        if self._water_next and not (self.clip.active or self.expr.active or self.water_walk):
+            step, self._water_next = self._water_next, None
+            step()
+        self._water_acc += TICK / 1000.0
+        if self._water_acc < 1.0:
+            return
+        dt, self._water_acc = self._water_acc, 0.0
+        self._water_idle_left -= dt
+        if self._water_idle_left <= 0:
+            self._water_idle, self._water_idle_left = water.user_idle_seconds(), 5.0
+        if self.water.phase == "away" and self.isVisible() and not self.water_walk:
+            self.water.since = self.water.away_for   # 菜单「显示/隐藏」把她叫出来了：直接返场
+        busy = (self.workout is not None or self.dragging or self.chat_paused or self.expr.active
+                or self.clip.active or self._water_next is not None or self.water_walk is not None
+                or self.shatter is not None)
+        for ev in self.water.update(dt, self._water_idle, busy):
+            if ev[0] == "level":
+                self._water_level(ev[1], ev[2])
+            elif ev[0] == "return":
+                self._water_return()
+
+    def _water_play(self, name, text=None, fades=(True, True), mirror=False, then=None):
+        """播一段喝水片段（正面开始；mirror 左右翻），打不开就换成 FALLBACK 里的表情。返回是不是片段。"""
+        self.stop_clip()
+        self.expr.stop()
+        self.jump_t, self.action, self.target, self.cur_speed = 0, None, None, 0.0
+        self.chat_paused = False
+        self.dir, self.facing, self.cross_t = "down", 1, 0.0
+        lib = water.clip_source(name)
+        ok = False
+        if lib is not None:
+            self.clip.lib = lib
+            ok = self.clip.start(name, fades) is not None
+            self.clip_mirror = mirror and ok
+            self._relayout()
+        if not ok:
+            self.clip.lib = None
+            self.expr.start(water.FALLBACK.get(name, "thirsty"))
+        if text:
+            self.last_line = ""
+            self.say(text)
+        self._water_next = then
+        return ok
+
+    def _water_level(self, level, welcome=False):
+        if level == 2:
+            self._water_walk_to_cursor(lambda: self._water_play("drink", water.line(2)))
+        elif level == 4:
+            self._water_finale()
+        else:
+            name = water.pick_clip(level, self._last_offer if level == 1 else None)
+            if level == 1:
+                self._last_offer = name
+            text = water.line("welcome") if welcome else water.line(level, m=int(self.water.interval // 60))
+            self._water_play(name, text)
+
+    def _water_walk_to_cursor(self, then):
+        """第二级：走到鼠标旁边再示范。"""
+        cursor = QCursor.pos()
+        geo = (QApplication.screenAt(cursor) or self.screen() or QApplication.primaryScreen()).availableGeometry()
+        side = 1 if cursor.x() > self.x() + self.width() / 2 else -1   # 站在鼠标靠她这一侧
+        tx = cursor.x() - side * self.width() * 0.45
+        tx = max(geo.left() + self.width() / 2, min(geo.right() - self.width() / 2, tx))
+        ty = max(geo.top() + self.height() / 2, min(geo.bottom() - self.height() / 2, cursor.y()))
+        self.stop_clip()
+        self.expr.stop()
+        self.water_walk = {"to": (tx, ty), "speed": 1.0, "then": then}
+
+    def _step_water_walk(self):
+        w = self.water_walk
+        cx, cy = self.x() + self.width() / 2, self.y() + self.height() / 2
+        dx, dy = w["to"][0] - cx, w["to"][1] - cy
+        dist = math.hypot(dx, dy)
+        step = SPEED * w["speed"] * TICK / 1000.0
+        if dist <= step:
+            self.move(int(w["to"][0] - self.width() / 2), int(w["to"][1] - self.height() / 2))
+            self.water_walk, self.target, self.cur_speed = None, None, 0.0
+            w["then"]()
+            return
+        self.move(int(cx + dx / dist * step - self.width() / 2), int(cy + dy / dist * step - self.height() / 2))
+        if abs(dx) > abs(dy) * 1.15:
+            self._set_dir("left" if dx < 0 else "right", 1 if dx < 0 else -1)
+        else:
+            self._set_dir("up" if dy < 0 else "down")
+        self.target, self.cur_speed = w["to"], SPEED * w["speed"]   # 画走路时的摇摆
+
+    def _water_finale(self):
+        """第四级：扔大水 → 碎屏 → 叉腰哼 → 转身 → 气鼓鼓走出屏幕。往离得近的那边跑。"""
+        self._water_home = self.foot_global()
+        geo = (self.screen() or QApplication.primaryScreen()).availableGeometry()
+        self._water_edge = 1 if self._water_home.x() >= geo.center().x() else -1
+        ok = self._water_play("water_throw", water.line(4), then=self._water_leave)
+        self._water_throw_at = water.THROW_AT if ok else water.THROW_AT_EXPR
+
+    def _water_shatter(self):
+        scr = self.screen() or QApplication.primaryScreen()
+        geo = scr.geometry()
+        foot = self.foot_global()
+        start = QPointF(foot.x(), foot.y() - self.cur_h * 1.15)
+        center = QPointF(geo.center())
+        impact = start + (center - start) * 0.55
+        self.shatter = water.ShatterOverlay(geo, start, impact, self.cur_h,
+                                            on_impact=self._on_shatter_impact)
+        self.shatter.destroyed.connect(self._on_shatter_gone)
+        self.shatter.show()
+
+    def _on_shatter_impact(self):
+        self.announcer.beep("crash")   # 咚
+        self.announcer.beep("go")      # 玻璃「叮」一声
+
+    def _on_shatter_gone(self, *_):
+        self.shatter = None
+
+    def _water_leave(self):
+        # 侧面图脸朝左：往右边跑就把这段镜像过来，最后一帧正好是朝右的侧面图
+        self._water_play("water_leave", water.line("leave"), fades=(True, False),
+                         mirror=self._water_edge > 0, then=self._water_exit)
+
+    def _water_exit(self):
+        geo = (self.screen() or QApplication.primaryScreen()).availableGeometry()
+        cy = self.y() + self.height() / 2
+        tx = geo.right() + self.width() if self._water_edge > 0 else geo.left() - self.width()
+        self._set_dir("right" if self._water_edge > 0 else "left", -1 if self._water_edge > 0 else 1)
+        self.cross_t = 0.0
+        self.water_fx = "angry"
+        self.water_walk = {"to": (tx, cy), "speed": 1.5, "then": self._water_gone}
+
+    def _water_gone(self):
+        self.water_fx = None
+        self.bubble_text = ""
+        self.hide()
+        self.water.left()
+        if self._water_preview:   # 菜单里预览的：别真等三五分钟
+            self.water.away_for, self._water_preview = 8.0, False
+        self._set_tray_tip(water.LINES["busy"][0])
+
+    def _water_return(self):
+        """从跑出去的那边走回原来的位置，再播返场片段（喝没喝等走到了再看）。"""
+        home = self._water_home or self.foot_global()
+        geo = (QApplication.screenAt(home) or self.screen() or QApplication.primaryScreen()).availableGeometry()
+        self._relayout()
+        cy = home.y() - self.head_room - self.cur_h + self.height() / 2
+        sx = geo.right() + self.width() if self._water_edge > 0 else geo.left() - self.width()
+        self.move(int(sx - self.width() / 2), int(cy - self.height() / 2))
+        self._set_dir("left" if self._water_edge > 0 else "right", 1 if self._water_edge > 0 else -1)
+        self.cross_t = 0.0
+        self.show()
+        self.water_walk = {"to": (home.x(), cy), "speed": 1.0, "then": self._water_back}
+        self._set_tray_tip(APP_NAME)
+
+    def _water_back(self):
+        drank = self.water.drank_away
+        self._water_play("water_return_makeup" if drank else "water_return_sulk",
+                         water.line("makeup" if drank else "sulk"), fades=(False, True),
+                         mirror=self.facing < 0, then=self.water.returned)
+
+    def _set_tray_tip(self, text):
+        tray = getattr(self.app, "tray", None)
+        if tray is not None:
+            tray.setToolTip(text)
+
+    def water_drink(self):
+        """人类说喝了：干杯（满 GOAL 杯再放一段蓝鲸现世）；她气跑的路上 / 不在时喝的，等她回来和好。"""
+        kind, n, was_cold = self.water.drink()
+        if kind == "late":
+            if self.isVisible():
+                self.last_line = ""
+                self.say(water.line("late"))
+            else:
+                tray = getattr(self.app, "tray", None)
+                if tray is not None:
+                    tray.showMessage(APP_NAME, water.line("away_drank"))
+            return
+        self.water_walk, self._water_throw_at = None, None
+        text = water.line("cold_end") if was_cold else water.line(
+            "goal" if n == water.GOAL else "cheers", n=n, goal=water.GOAL)
+        if self.workout:
+            self.last_line = ""
+            self.say(text)
+            return
+        then = None
+        if n == water.GOAL and clips.AVAILABLE and "蓝鲸现世" in clips.CLIPS:
+            then = lambda: self.play_clip("蓝鲸现世")
+        self._water_play("water_cheers", text, then=then)
+
+    def water_snooze(self):
+        if self.water.snooze():
+            self.water_walk, self._water_next = None, None
+            self.stop_clip()
+            self.expr.start("cry")
+            self.last_line = ""
+            self.say(water.line("snooze"))
+
+    def water_call_back(self):
+        tray = getattr(self.app, "tray", None)
+        if tray is not None:
+            tray.showMessage(water.LINES["busy"][0], water.LINES["busy"][1])
+
+    def water_preview(self, level):
+        if self._busy_training():
+            return
+        if self.water.force(level) is None:
+            self.last_line = ""
+            self.say("还在气头上呢！")
+            return
+        self._water_preview = level == 4
+        self._water_level(level)
+
+    def _set_water_cfg(self, key, value):
+        self.cfg[key] = value
+
+    def _add_water_menu(self, m):
+        w = self.water
+        wm = m.addMenu("💧 喝水提醒")
+        wm.addAction(f"我喝了（今天 {w.cups()}/{water.GOAL} 杯）", self.water_drink)
+        if w.phase == "remind":
+            wm.addAction("等会儿再提醒（10 分钟）", self.water_snooze)
+        if w.phase == "away":
+            wm.addAction("叫她回来", self.water_call_back)
+        wm.addSeparator()
+        on = wm.addAction("开启喝水提醒")
+        on.setCheckable(True)
+        on.setChecked(w.enabled)
+        on.triggered.connect(lambda v: self._set_water_cfg("water_on", bool(v)))
+        im = wm.addMenu("间隔")
+        for mins in water.INTERVALS:
+            a = im.addAction(f"每 {mins} 分钟")
+            a.setCheckable(True)
+            a.setChecked(self.cfg.get("water_interval", 45) == mins)
+            a.triggered.connect(lambda _c=False, v=mins: self._set_water_cfg("water_interval", v))
+        q = wm.addAction("夜里不提醒（22:00–9:00）")
+        q.setCheckable(True)
+        q.setChecked(bool(self.cfg.get("water_quiet", True)))
+        q.triggered.connect(lambda v: self._set_water_cfg("water_quiet", bool(v)))
+        today = datetime.date.today().isoformat()
+        mu = wm.addAction("今天别提醒了")
+        mu.setCheckable(True)
+        mu.setChecked(self.cfg.get("water_mute") == today)
+        mu.triggered.connect(lambda v: self._set_water_cfg("water_mute", today if v else ""))
+        wm.addSeparator()
+        pm = wm.addMenu("预览")
+        for level, label in [(1, "到点：递水壶"), (2, "+5 分钟：走过来示范"), (3, "+10 分钟：敲屏幕"),
+                             (4, "+15 分钟：扔大水、气跑")]:
+            pm.addAction(label, lambda _c=False, lv=level: self.water_preview(lv))
+        pm.addAction("喝了：干杯", lambda: self._water_play("water_cheers", "预览：干杯！"))
 
     def _maybe_idle_action(self):
         if random.random() < 0.01:
@@ -899,6 +1180,7 @@ class PetWindow(QWidget):
         self._set_dir("down", 1)
         self.cross_t = 0.0
         # start() 会先停掉正在播的那段：新的打不开时窗口也要缩回三视图，不能留着撑大的透明区挡鼠标
+        self.clip.lib, self.clip_mirror = None, False
         ok = self.clip.start(name) is not None
         self._relayout()
         return ok
@@ -989,15 +1271,24 @@ class PetWindow(QWidget):
             self.open_food_panel()
 
     def _on_single_click(self):
-        """单击：蹦跳回嘴 + 弹功能面板（不想用点鱼身外关闭）；跟练时单击是暂停 / 继续"""
+        """单击：蹦跳回嘴 + 弹功能面板（不想用点鱼身外关闭）；跟练时单击是暂停 / 继续；
+        喝水提醒中（包括扔大水、气跑、返场的路上）单击是「喝了」；抠门模式里只回一两个字"""
         if self.workout and not self.workout.finished:
             self.workout_pause()
             self.chat_paused = False
             return
-        if random.random() < 0.7:
-            self.jump_t = 1.0
-        if random.random() < 0.6:
-            self.say(random.choice(REACT_LINES))
+        if self.water.phase in ("remind", "finale", "back"):
+            self.water_drink()
+            self.chat_paused = False
+            return
+        if self.water.cold > 0:
+            self.last_line = ""
+            self.say(water.line("cold"))
+        else:
+            if random.random() < 0.7:
+                self.jump_t = 1.0
+            if random.random() < 0.6:
+                self.say(random.choice(REACT_LINES))
         panel = self.function_panel
         panel.popup_at(self.x() + self.width() / 2 - panel.width() / 2,
                        self.y() + self.head_room - BUBBLE_H - panel.height() + 10)
@@ -1065,6 +1356,7 @@ class PetWindow(QWidget):
         m = QMenu(self)
         m.addAction("🗼 爬塔", self.open_tower)
         self._add_workout_menu(m)
+        self._add_water_menu(m)
         m.addSeparator()
         expr_menu = m.addMenu("做个表情")
         expr_menu.addAction("随机", self.play_random)
