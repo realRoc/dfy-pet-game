@@ -114,7 +114,7 @@ class WaterReminder:
     - wait：等下一次。人在电脑前才计时，到点了（且不忙、不在夜里）就发 ("level", 1, 是否刚回来)
     - remind：正在提醒，第 1~3 级；每隔 LEVEL_GAP 秒升一级
     - finale：第 4 级，扔大水、气跑，桌宠演完了调 left()
-    - away：不在，AWAY_SECS 秒后发 ("return", 不在时喝没喝)
+    - away：不在，AWAY_SECS 秒后发 ("return", 不在时喝没喝)；人类说喝了就马上发，不用等到点
     - back：返场中，桌宠演完了调 returned()
     配置存在 cfg 里：water_on、water_interval（分钟）、water_quiet（夜里不提醒）、water_mute（这天别提醒了）、
     water_cups（{"date", "n"}，今天喝了几杯）。"""
@@ -200,13 +200,15 @@ class WaterReminder:
     # ----- 人类的回应 -----
     def drink(self, now=None):
         """人类喝了。返回 (情形, 今天第几杯, 是不是从抠门模式里出来)；情形：
-        "cheers" 平时 / 提醒中喝的，"late" 扔大水气跑的路上、不在的时候、返场路上喝的（等她回来再和好）。"""
+        "cheers" 平时 / 提醒中喝的，"late" 扔大水气跑的路上、不在的时候、返场路上喝的（她马上回来和好）。"""
         now = now or datetime.datetime.now()
         n = self.cups(now) + 1
         self.cfg["water_cups"] = {"date": now.date().isoformat(), "n": n}
         was_cold, self.cold = self.cold > 0, 0.0
         if self.phase in ("finale", "away", "back"):
             self.drank_away = True
+            if self.phase == "away":
+                self.away_for = self.since   # 喝了就别在外面晾着了：下一秒就返场
             return "late", n, was_cold
         self._reset()
         return "cheers", n, was_cold
@@ -226,9 +228,9 @@ class WaterReminder:
         return self._raise(level)
 
     def left(self):
-        """气跑出屏幕了。"""
+        """气跑出屏幕了；跑的路上人类已经喝了的话，转身就回来。"""
         self.phase, self.since = "away", 0.0
-        self.away_for = random.uniform(*AWAY_SECS)
+        self.away_for = 0.0 if self.drank_away else random.uniform(*AWAY_SECS)
 
     def returned(self):
         """返场演完了：没喝的话进抠门模式。"""
