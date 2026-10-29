@@ -1354,7 +1354,9 @@ class PetWindow(QWidget):
             self.say("浏览器没打开，手动打开 content/tower/index.html")
 
     def _build_menu(self):
-        m = QMenu(self)
+        return self._fill_menu(QMenu(self))
+
+    def _fill_menu(self, m):
         m.addAction("🗼 爬塔", self.open_tower)
         self._add_workout_menu(m)
         self._add_water_menu(m)

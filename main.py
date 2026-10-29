@@ -2,8 +2,9 @@
 import os
 import sys
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication, QMessageBox, QSystemTrayIcon
+from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
 from common import APP_NAME, SPRITE_DIR, load_config, save_config, relaunch_in_mac_app
 from pet import PetWindow
@@ -18,8 +19,12 @@ class PetApp:
         # 托盘（macOS 是菜单栏图标）：鼠标穿透后从这里解除
         self.tray = QSystemTrayIcon(self.pet.icon, self.pet)
         self.tray.setToolTip(APP_NAME)
+        # 托盘只用这一个菜单，打开前原地重建内容。macOS 上 activated 是菜单已经弹出来时才发，
+        # 那时再 setContextMenu 换菜单、删旧菜单，正弹着的菜单就被删了，一点就闪退
+        self.tray_menu = QMenu(self.pet)
+        self.tray_menu.aboutToShow.connect(self._refresh_tray_menu)
         self._refresh_tray_menu()
-        self.tray.activated.connect(self._on_tray_activated)
+        self.tray.setContextMenu(self.tray_menu)
         self.tray.show()
 
         self._show(self.pet)
@@ -31,16 +36,15 @@ class PetApp:
         w.raise_()
         w.activateWindow()
 
-    def _on_tray_activated(self, _reason):
-        # 菜单里的勾选状态（模式、穿透等）每次打开前刷新
-        self._refresh_tray_menu()
-
     def _refresh_tray_menu(self):
-        """换一棵新菜单；setContextMenu 不接管旧的，旧的挂在桌宠窗口下，得自己删。"""
-        old = self.tray.contextMenu()
-        self.tray.setContextMenu(self.pet._build_menu())
-        if old is not None:
-            old.deleteLater()
+        """菜单里的勾选状态（模式、穿透等）、喝水杯数每次打开前刷新。
+        clear() 只删动作、不删子菜单，旧子菜单挂在托盘菜单下，得自己删。"""
+        m = self.tray_menu
+        old_subs = m.findChildren(QMenu, options=Qt.FindChildOption.FindDirectChildrenOnly)
+        m.clear()
+        for sub in old_subs:
+            sub.deleteLater()
+        self.pet._fill_menu(m)
 
     def toggle_visible(self):
         if self.pet.isVisible():
