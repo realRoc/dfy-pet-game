@@ -71,10 +71,24 @@ class WaterReminderTest(unittest.TestCase):
         self.assertEqual(self.w.drink(DAY)[0], "late")
         self.w.left()
         self.assertEqual(self.w.drink(DAY)[0], "late")
-        self.assertEqual(run(self.w, water.AWAY_SECS[1]), [("return", True)])
+        self.assertEqual(run(self.w, 1), [("return", True)])
         self.w.returned()
         self.assertEqual(self.w.cold, 0)
         self.assertEqual(self.w.cups(DAY), 2)
+
+    def test_drink_while_away_returns_at_once(self):
+        run(self.w, 45 * 60 + 900)
+        self.w.left()
+        self.assertEqual(run(self.w, 30), [])
+        self.assertEqual(self.w.drink(DAY)[0], "late")
+        self.assertEqual(run(self.w, 1), [("return", True)], "喝了就马上回来，不等 AWAY_SECS")
+        self.assertEqual(self.w.phase, "back")
+
+    def test_drink_on_the_way_out_turns_back(self):
+        run(self.w, 45 * 60 + 900)
+        self.w.drink(DAY)
+        self.w.left()
+        self.assertEqual(run(self.w, 1), [("return", True)])
 
     def test_drink_resets_and_counts_per_day(self):
         run(self.w, 45 * 60 + 300)
@@ -237,6 +251,17 @@ class PetWaterFlowTest(unittest.TestCase):
         pet._on_single_click()
         self.assertTrue(pet.water.drank_away)
         self.assertTrue(self.ticks(15000, lambda: pet.water.phase == "wait"))
+        self.assertEqual(pet.water.cold, 0)
+
+    def test_drink_while_away_comes_back_now(self):
+        pet = self.pet
+        pet.water_preview(4)
+        self.assertTrue(self.ticks(15000, lambda: not pet.isVisible()), "走出屏幕藏起来")
+        pet.water.away_for = water.AWAY_SECS[1]   # 当真等三五分钟的那种
+        pet.water_drink()
+        self.assertTrue(self.ticks(100, lambda: pet.isVisible()), "喝了就马上走回来")
+        self.assertEqual(pet.water.phase, "back")
+        self.assertTrue(self.ticks(5000, lambda: pet.water.phase == "wait"))
         self.assertEqual(pet.water.cold, 0)
 
 

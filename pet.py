@@ -1003,7 +1003,7 @@ class PetWindow(QWidget):
         self.hide()
         self.water.left()
         if self._water_preview:   # 菜单里预览的：别真等三五分钟
-            self.water.away_for, self._water_preview = 8.0, False
+            self.water.away_for, self._water_preview = min(self.water.away_for, 8.0), False
         self._set_tray_tip(water.LINES["busy"][0])
 
     def _water_return(self):
@@ -1032,7 +1032,7 @@ class PetWindow(QWidget):
             tray.setToolTip(text)
 
     def water_drink(self):
-        """人类说喝了：干杯（满 GOAL 杯再放一段蓝鲸现世）；她气跑的路上 / 不在时喝的，等她回来和好。"""
+        """人类说喝了：干杯（满 GOAL 杯再放一段蓝鲸现世）；她气跑的路上 / 不在时喝的，她马上回来和好。"""
         kind, n, was_cold = self.water.drink()
         if kind == "late":
             if self.isVisible():
