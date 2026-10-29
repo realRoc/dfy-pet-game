@@ -81,11 +81,21 @@ class PetAppSmokeTest(unittest.TestCase):
         closer.start(0)
         self.addCleanup(closer.stop)
         for _ in range(5):
-            self.app._on_tray_activated(None)
+            self.app.tray_menu.aboutToShow.emit()
             pet.contextMenuEvent(QContextMenuEvent(QContextMenuEvent.Reason.Mouse, QPoint(1, 1), QPoint(1, 1)))
             pet.show_workout_menu()
             flush()
         self.assertEqual(len(pet.findChildren(QMenu)), base)
+
+    def test_tray_menu_rebuilt_in_place(self):
+        """macOS 上菜单栏菜单弹出来时才刷新；换掉或删掉正弹着的菜单，菜单就闪一下没了。"""
+        menu = self.app.tray.contextMenu()
+        self.app.pet.set_mode("still")
+        menu.aboutToShow.emit()
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.assertIs(self.app.tray.contextMenu(), menu)
+        mode_menu = next(a.menu() for a in menu.actions() if a.text() == "模式")
+        self.assertEqual([a.text() for a in mode_menu.actions() if a.isChecked()], ["原地待着"])
 
 
 if __name__ == "__main__":
