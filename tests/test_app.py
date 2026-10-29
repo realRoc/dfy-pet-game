@@ -94,8 +94,9 @@ class PetAppSmokeTest(unittest.TestCase):
         menu.aboutToShow.emit()
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         self.assertIs(self.app.tray.contextMenu(), menu)
-        mode_menu = next(a.menu() for a in menu.actions() if a.text() == "模式")
-        self.assertEqual([a.text() for a in mode_menu.actions() if a.isChecked()], ["原地待着"])
+        # 先拿住 QAction：PySide6 6.10 里它的包装一回收，menu() 拿到的子菜单包装就失效了
+        act = next(a for a in menu.actions() if a.text() == "模式")
+        self.assertEqual([a.text() for a in act.menu().actions() if a.isChecked()], ["原地待着"])
 
 
 if __name__ == "__main__":
