@@ -315,7 +315,9 @@ class PetWindow(QWidget):
         self.mode = self.cfg["mode"] if self.cfg["mode"] in ("wander", "follow", "still") else "wander"
         self.dir = "down"
         self.facing = 1
-        self.target = None
+        self.target = None            # 要走到的窗口中心 (x, y)
+        self.stuck_ticks = 0          # 走路时窗口被系统挡住没挪动的帧数
+        self.walk_pos = None          # 上一帧走路前窗口的位置
         self.rest_until = 0
         self.cur_speed = 0.0
         self.prev_key = None
@@ -713,7 +715,7 @@ class PetWindow(QWidget):
             else:
                 tx = max(geo.left(), min(geo.right() - self.width(), cursor.x() - self.width() / 2))
                 ty = max(geo.top(), min(geo.bottom() - self.height(), cursor.y() - 90))
-                self.target = (tx, ty)
+                self.target = (tx + self.width() / 2, ty + self.height() / 2)
         elif self.mode == "wander":
             if self.target is None:
                 if now_ms < self.rest_until:
@@ -721,8 +723,11 @@ class PetWindow(QWidget):
                     self.update()
                     return
                 geo = (self.screen() or QApplication.primaryScreen()).availableGeometry()
-                self.target = (random.randint(geo.left() + 40, max(geo.left() + 41, geo.right() - self.width() - 40)),
-                               random.randint(geo.top() + 40, max(geo.top() + 41, geo.bottom() - self.height() - 40)))
+                # 先挑窗口左上角（整个窗口留在屏幕里），再换成中心：target 是中心，之前直接拿左上角当中心，
+                # 窗口一半跑到屏幕外，macOS 把它卡在菜单栏下面，就一直背身原地走、不停下来做表情
+                x = random.randint(geo.left() + 40, max(geo.left() + 41, geo.right() - self.width() - 40))
+                y = random.randint(geo.top() + 40, max(geo.top() + 41, geo.bottom() - self.height() - 40))
+                self.target = (x + self.width() / 2, y + self.height() / 2)
         else:
             self._maybe_idle_action()
             self.update()
@@ -732,13 +737,18 @@ class PetWindow(QWidget):
             cx, cy = self.x() + self.width() / 2, self.y() + self.height() / 2
             dx, dy = self.target[0] - cx, self.target[1] - cy
             dist = (dx * dx + dy * dy) ** 0.5
-            if dist < 12:
+            if dist < 12 or self.stuck_ticks > 50:   # 到了，或者被屏幕边挡住走了一秒没动：就地歇着
                 self.target = None
+                self.stuck_ticks = 0
                 self.rest_until = self.t * TICK + random.randint(8000, 18000)
                 self._set_dir("down")
             else:
                 step = self.cur_speed * TICK / 1000.0
                 nx, ny = cx + dx / dist * step, cy + dy / dist * step
+                # 和上一帧比：move 之后 pos() 可能先报要去的位置，系统把窗口挡回来要到下一帧才看得出
+                stuck = step >= 2 and self.pos() == self.walk_pos
+                self.stuck_ticks = self.stuck_ticks + 1 if stuck else 0
+                self.walk_pos = self.pos()
                 self.move(int(nx - self.width() / 2), int(ny - self.height() / 2))
                 if abs(dx) > abs(dy) * 1.15:
                     self._set_dir("left" if dx < 0 else "right", 1 if dx < 0 else -1)
