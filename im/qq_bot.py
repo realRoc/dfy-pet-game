@@ -79,6 +79,8 @@ class QQAdapter(Adapter):
     platform = "qq"
     label = "QQ"
     RETRY = (2, 5, 10, 30, 60)
+    STABLE = 60          # 上线撑过这么多秒才算连好了，重连等待从头算；不然服务端一连上就踢，会 2 秒猛连一次
+    MISSED_ACKS = 2      # 连着这么多次心跳没回 ACK，就当连接已经断了（半开连接写进去不报错，只能靠这个发现）
 
     @staticmethod
     def available():
@@ -123,9 +125,9 @@ class QQAdapter(Adapter):
         try:
             while not self.closing:
                 self.set_status("connecting", "连接中…")
+                online_for = 0
                 try:
-                    await self._session_once()
-                    tries = 0
+                    online_for = await self._session_once()
                 except PermissionError as e:
                     self.set_status("error", str(e))
                     return       # 密钥不对，重连也没用
@@ -133,16 +135,22 @@ class QQAdapter(Adapter):
                     self.set_status("error", f"断开了：{str(e)[:80] or type(e).__name__}，稍后重连")
                 if self.closing:
                     break
+                if online_for >= self.STABLE:
+                    tries = 0
                 await asyncio.sleep(self.RETRY[min(tries, len(self.RETRY) - 1)])
                 tries += 1
         finally:
             await self.session.close()
 
     async def _session_once(self):
+        """连一次网关，一直收到断开为止。返回上线（READY）后撑了几秒，没上线就是 0。"""
         url = (await self._api("GET", "/gateway"))["url"]
         async with self.session.ws_connect(url, heartbeat=None) as ws:
             seq = None
             beat = None
+            ready_at = None
+            last_ack = time.monotonic()
+            dead = False
             try:
                 async for frame in ws:
                     if frame.type != aiohttp.WSMsgType.TEXT:
@@ -155,14 +163,23 @@ class QQAdapter(Adapter):
                         interval = data["d"]["heartbeat_interval"] / 1000
 
                         async def heartbeat():
+                            nonlocal dead
                             while True:
                                 await asyncio.sleep(interval)
+                                if time.monotonic() - last_ack > interval * (self.MISSED_ACKS + 0.5):
+                                    dead = True
+                                    await ws.close()   # 收消息的循环随之结束，走下面的重连
+                                    return
                                 await ws.send_json({"op": 1, "d": seq})
+                        last_ack = time.monotonic()
                         beat = asyncio.ensure_future(heartbeat())
                         await ws.send_json({"op": 2, "d": {"token": f"QQBot {await self._access_token()}",
                                                            "intents": INTENT_GROUP_AND_C2C, "shard": [0, 1]}})
+                    elif op == 11:   # HEARTBEAT_ACK
+                        last_ack = time.monotonic()
                     elif op == 0:
                         if data.get("t") == "READY":
+                            ready_at = time.monotonic()
                             bot = (data.get("d") or {}).get("user") or {}
                             self.set_status("online", f"已上线：{bot.get('username') or self.conf['app_id']}")
                         else:
@@ -178,6 +195,9 @@ class QQAdapter(Adapter):
                 raise PermissionError("鉴权失败：AppID / AppSecret 不对")
             if ws.close_code in (4914, 4915):
                 raise PermissionError("这个机器人没开通单聊 / 群聊的消息权限，去开放平台的开发设置里看看")
+            if dead:
+                raise RuntimeError("心跳没有回应，连接可能断了")
+        return 0 if ready_at is None else time.monotonic() - ready_at
 
     async def _answer(self, msg):
         out = await asyncio.to_thread(self.hub.handle, msg)

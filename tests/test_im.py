@@ -359,6 +359,36 @@ class _WS:
         self.sent.append(data)
 
 
+class _HangingWS(_WS):
+    """帧发完以后一直等，直到被 close()；ack=True 时每个心跳都回一个 ACK。"""
+
+    def __init__(self, frames, ack=False):
+        super().__init__(frames)
+        self.ack, self.closed = ack, False
+        self.wake = None
+
+    async def __anext__(self):
+        if self.wake is None:
+            self.wake = asyncio.Event()
+        while not self.frames:
+            if self.closed:
+                raise StopAsyncIteration
+            self.wake.clear()
+            await self.wake.wait()
+        return NS(type=qq_bot.aiohttp.WSMsgType.TEXT, data=json.dumps(self.frames.pop(0)))
+
+    async def send_json(self, data):
+        self.sent.append(data)
+        if self.ack and data.get("op") == 1:
+            self.frames.append({"op": 11})
+            self.wake.set()
+
+    async def close(self):
+        self.closed = True
+        if self.wake:
+            self.wake.set()
+
+
 class _Session:
     def __init__(self, ws):
         self.ws, self.posts = ws, []
@@ -402,6 +432,44 @@ class QQGatewayTest(unittest.TestCase):
         self.assertEqual((method, url), ("POST", "https://api.sgroup.qq.com/v2/users/o1/messages"))
         self.assertEqual(body["content"], "回 hi")
         self.assertEqual(headers, {"Authorization": "QQBot TOKEN"})
+
+    def test_missing_heartbeat_ack_reconnects(self):
+        """半开连接：心跳写进去不报错、也收不到任何帧。连着两次没 ACK 就自己断开，抛错走重连，而不是一直挂着「在线」。"""
+        ws = _HangingWS([{"op": 10, "d": {"heartbeat_interval": 20}},
+                         {"op": 0, "s": 1, "t": "READY", "d": {"user": {"username": "b"}}}])
+        a = qq_bot.QQAdapter(NS(handle=None), {"app_id": "1", "secret": "s"})
+        a.session = _Session(ws)
+        with self.assertRaisesRegex(RuntimeError, "心跳"):
+            asyncio.run(asyncio.wait_for(a._session_once(), 2))
+        self.assertTrue(ws.closed)
+
+    def test_acked_heartbeat_stays_connected(self):
+        ws = _HangingWS([{"op": 10, "d": {"heartbeat_interval": 20}}], ack=True)
+        a = qq_bot.QQAdapter(NS(handle=None), {"app_id": "1", "secret": "s"})
+        a.session = _Session(ws)
+        with self.assertRaises(asyncio.TimeoutError):   # 0.3 秒里发了十几次心跳都有 ACK，一直连着
+            asyncio.run(asyncio.wait_for(a._session_once(), 0.3))
+        self.assertGreater(sum(1 for m in ws.sent if m["op"] == 1), 5)
+        self.assertFalse(ws.closed)
+
+    def test_backoff_resets_only_after_stable_session(self):
+        """服务端一连上就踢（op 7 / 9、握手后马上关）时，等待时间要一路加长，不能每次都从 2 秒重来。"""
+        a = qq_bot.QQAdapter(NS(handle=None), {"app_id": "1", "secret": "s"})
+        online = iter([0, 0, 0, 0, 0, 0, 120, 0])
+        delays = []
+
+        async def session_once():
+            return next(online)
+
+        async def sleep(d):
+            delays.append(d)
+            if len(delays) == 8:
+                a.closing = True
+        a._session_once = session_once
+        with mock.patch.object(qq_bot.aiohttp, "ClientSession", lambda **kw: _Session(None)), \
+                mock.patch.object(qq_bot.asyncio, "sleep", sleep):
+            asyncio.run(a.run())
+        self.assertEqual(delays, [2, 5, 10, 30, 60, 60, 2, 5])
 
     def test_auth_failure_stops(self):
         ws = _WS([])
