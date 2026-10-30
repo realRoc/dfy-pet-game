@@ -7,6 +7,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import QApplication
 
+from character import CHAR
+
 if getattr(sys, "frozen", False):
     APP_DIR = os.path.dirname(sys.executable)
     BUNDLE_DIR = getattr(sys, "_MEIPASS", APP_DIR)
@@ -16,7 +18,6 @@ else:
 # 配置、自写的训练计划、macOS 的 .app 外壳这些要写的东西放这里。
 # 作为 dsh 插件跑时代码在 node_modules 里，升级会整个换掉，dsh 插件用 DFY_DATA_DIR 指到它自己的数据目录
 DATA_DIR = os.environ.get("DFY_DATA_DIR") or APP_DIR
-SPRITE_DIR = os.path.join(BUNDLE_DIR, "sprites")
 # 爬塔的单文件网页（tower/ 里 npm run release 生成），桌宠用系统浏览器打开它
 TOWER_HTML = os.path.join(BUNDLE_DIR, "content", "tower", "index.html")
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
@@ -26,8 +27,11 @@ IS_WIN = sys.platform == "win32"
 UI_FONT = "PingFang SC" if IS_MAC else "Microsoft YaHei UI"
 EMOJI_FONT = "Apple Color Emoji" if IS_MAC else "Segoe UI Emoji"
 
-APP_NAME = "大肥鱼"
-SPRITE_SRC_H = 340  # sprites/ 里原图的高度
+APP_NAME = CHAR.name
+SPRITE_SRC_H = CHAR.sprite_h  # 角色包里立绘原图的高度
+ICON_PATH = CHAR.sprite("icon")
+# 引擎里三视图的名字 → 清单里的键
+VIEWS = {"正面": "front", "侧面": "side", "背面": "back"}
 
 DEFAULT_CFG = {
     "mode": "wander",
@@ -140,8 +144,10 @@ def load_sprites(height):
     dpr = screen.devicePixelRatio() if screen else 1.0
     px_h = min(SPRITE_SRC_H, int(height * dpr))
     out = {}
-    for name in ("正面", "侧面", "背面"):
-        pix = QPixmap(os.path.join(SPRITE_DIR, f"{name}.png"))
+    for name, view in VIEWS.items():
+        pix = QPixmap(CHAR.sprite(view))
+        if view == "side" and CHAR.side_faces == "right":   # 引擎按侧面图脸朝左来镜像
+            pix = QPixmap.fromImage(pix.toImage().flipped(Qt.Orientation.Horizontal))
         pix = pix.scaledToHeight(px_h, Qt.TransformationMode.SmoothTransformation)
         pix.setDevicePixelRatio(px_h / height)
         out[name] = pix

@@ -38,6 +38,12 @@ class PersonaTest(unittest.TestCase):
         self.assertIn("嘴硬心软", p["prompt"])     # 是 dfy-qq preset 那段，不是保底的
         self.assertIn("happy", p["moods"])
 
+    def test_character_pack_im_system_wins(self):
+        with mock.patch.dict(persona.CHAR.persona, {"im_system": "你是测试角色，现在通过 QQ 和大家聊天。"}):
+            self.assertEqual(persona.character_persona()["prompt"], "你是测试角色，现在通过 QQ 和大家聊天。")
+            self.assertIn("通过 Discord", persona.system_prompt("Discord"))
+        self.assertEqual(persona.character_persona()["name"], persona.CHAR.name)
+
     def test_platform_prompt(self):
         s = persona.system_prompt("Discord")
         self.assertIn("通过 Discord 和大家聊天", s)
@@ -556,7 +562,7 @@ class AppTest(unittest.TestCase):
         self.assertIn("🔗 连接 IM", self.menu_texts(app))
         from PySide6.QtWidgets import QPushButton
         tips = [b.toolTip() for b in app.pet.function_panel.findChildren(QPushButton)]
-        self.assertEqual(tips, ["聊天", "爬塔", "跟练", "连接 IM"])
+        self.assertEqual(tips, ["聊天", "爬塔", "跟练", "后宅", "连接 IM"])
         self.assertEqual(set(app.im.dialog.sections), {"qq", "discord"})
         app.im.dialog.close()
 

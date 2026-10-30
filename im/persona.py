@@ -1,14 +1,13 @@
 """角色在 IM 里的人设。
 
-现在的人设只写在一处：`cordis.patch.yml` 里给 dsh-qqbot 用的 `dfy-qq` preset（`prefix: |-` 那段）。
-这里直接从那段读，不再抄一份；dsh 那条路线专用的说法（「通过 QQ」、工具 dafeiyu_desktop）换成当前平台和
-本模块的桌面联动约定。
-
-角色包（`characters/<id>/character.json`）合并以后，把 `character_persona()` 改成读角色包里的人设即可，
-返回的字段不变。"""
+角色名取当前角色包（`character.CHAR`）。IM 人设优先用角色包的 `persona.im_system`；
+没写的话用 `cordis.patch.yml` 里给 dsh-qqbot 用的 `dfy-qq` preset（`prefix: |-` 那段）——
+大肥鱼的 IM 人设现在只写在那一处，这里直接读，不再抄一份。dsh 那条路线专用的说法（「通过 QQ」、
+工具 dafeiyu_desktop）换成当前平台和本模块的桌面联动约定。"""
 import os
 import re
 
+from character import CHAR
 from expressions import EXPRESSIONS
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -42,12 +41,14 @@ def _yaml_block(text, key):
 
 def character_persona():
     """{"name": 角色名, "prompt": 人设原文（QQ 版）, "moods": 能做的表情键}。"""
-    try:
-        with open(PATCH_PATH, encoding="utf-8") as f:
-            prompt = _yaml_block(f.read(), "prefix")
-    except OSError:
-        prompt = None
-    return {"name": "大肥鱼", "prompt": prompt or _FALLBACK, "moods": list(EXPRESSIONS)}
+    prompt = CHAR.persona.get("im_system")
+    if not prompt:
+        try:
+            with open(PATCH_PATH, encoding="utf-8") as f:
+                prompt = _yaml_block(f.read(), "prefix")
+        except OSError:
+            prompt = None
+    return {"name": CHAR.name, "prompt": prompt or _FALLBACK, "moods": list(EXPRESSIONS)}
 
 
 DESKTOP_RULES = """桌面联动：你的回复必须是一个 JSON 对象：

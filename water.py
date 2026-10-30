@@ -3,7 +3,7 @@
 几块：
 - WaterReminder：计时和升级的状态机，不碰界面，方便测。人在电脑前才计时（键鼠空闲 5 分钟以上算不在），
   夜里不提醒，跟练、拖拽、聊天时先不打扰，等空下来再说。
-- 片段：content/water/clips/ 里 Seedance 生成的透明视频（怎么来的见 tools/make_water_clips.py），
+- 片段：角色包的 water 动画目录里 Seedance 生成的透明视频（怎么来的见 tools/make_water_clips.py），
   「示范喝水」用跟练动画的 drink。都从正面站姿开始、回到正面站姿，只有气跑那段停在侧面站姿、返场两段从侧面站姿开始，
   好接上平时走路的侧面图。没装 PyAV 或素材缺失时换成 expressions 里的表情。
 - ShatterOverlay：扔大水那一下：大瓶水转着飞向屏幕、玻璃裂开、水花溅在玻璃上顺着裂缝往下流。
@@ -25,9 +25,10 @@ from PySide6.QtWidgets import QWidget
 
 import clips as clip_lib
 import workout
-from common import BUNDLE_DIR, IS_MAC, IS_WIN, emoji_font, ui_font
+from character import CHAR
+from common import IS_MAC, IS_WIN, emoji_font, ui_font
 
-CLIP_DIR = os.path.join(BUNDLE_DIR, "content", "water", "clips")
+CLIP_DIR = CHAR.anim_dir("water") or ""
 CLIP_FADE = 0.15
 
 INTERVALS = [30, 45, 60, 90]   # 分钟
@@ -39,7 +40,7 @@ AWAY_LONG = 900      # 离开这么久回来，先提醒一次
 QUIET = (22, 9)      # 这段时间不提醒
 AWAY_SECS = (180, 300)   # 气跑以后多久回来
 COLD_SECS = 600      # 回来时还没喝：抠门模式多久
-THROW_AT = 3.9       # water_throw 里水瓶飞到镜头前、整幅挡住画面的时刻（秒）；换成表情时用 THROW_AT_EXPR
+THROW_AT = CHAR.timing.get("water_throw_at", 3.9)   # water_throw 里水瓶飞到镜头前、整幅挡住画面的时刻（秒）；换成表情时用 THROW_AT_EXPR
 THROW_AT_EXPR = 0.9
 
 # 每一级播哪段（同一级有几段时随机挑，不和上次重样）
@@ -51,25 +52,14 @@ FALLBACK = {
     "water_return_makeup": "love", "water_cheers": "happy",
 }
 
-LINES = {
-    1: ["该喝水啦～💧", "已深度思考（用时 {m} 分钟）：你该喝水了", "本鲸提醒：喝口水再干活",
-        "先喝水后干活，大肥鱼说的", "喝口水吧，一口就行～"],
-    "welcome": ["欢迎回来！先喝口水～", "回来啦？先喝口水再干活！"],
-    2: ["看，像这样，咕嘟咕嘟——", "示范一遍：拿起杯子，喝。", "你不喝我先喝了啊！"],
-    3: ["咚咚咚！有人吗？该喝水了！", "严肃实践大水理论！", "成功的人桌上都有大水。", "弱者才喝饮料，强者都喝大水！"],
-    4: ["不理我是吧——", "大水攻击！！", "这瓶大水你接好了！"],
-    "leave": ["本鲸记下了。", "我去评论区说你坏话了！", "哼，不理你了！", "我去吃饭了，喝完告诉我就行！"],
-    "away_drank": ["（远处传来）……哼，这还差不多。"],
-    "busy": ["大肥鱼服务器暂时不可用", "服务器繁忙，请稍后再试。"],
-    "sulk": ["……喝吧。", "哼，水给你放这了。", "……省 token，不说了。"],
-    "makeup": ["……那、那就原谅你了", "喝了就好～本鲸大人有大量", "这才对嘛！"],
-    "cheers": ["干杯！今天第 {n}/{goal} 杯～", "咕嘟！今天 {n}/{goal} 杯", "好耶！今天 {n}/{goal} 杯了"],
-    "goal": ["{goal} 杯达成！严肃实践大水理论！", "今天 {n} 杯！你就是大水理论本论！"],
-    "late": ["现在才喝？哼！", "晚了！……不过喝了就好。"],
-    "cold": ["嗯。", "哦。", "喝水。", "省 token 中。", "……"],
-    "cold_end": ["……行吧，原谅你了。"],
-    "snooze": ["那……就 10 分钟哦", "说好的 10 分钟！本鲸记下了"],
-}
+# 台词在角色包里（lines.water）；JSON 的键是字符串，几级提醒换回数字
+_DEFAULT_LINES = {1: ["该喝水啦～"], "welcome": ["欢迎回来！先喝口水～"], 2: ["看，像这样喝——"], 3: ["该喝水了！"],
+                  4: ["接好了！"], "leave": ["哼！"], "away_drank": ["……这还差不多。"], "busy": ["暂时不可用", "请稍后再试。"],
+                  "sulk": ["……喝吧。"], "makeup": ["原谅你了"], "cheers": ["干杯！今天 {n}/{goal} 杯"],
+                  "goal": ["{goal} 杯达成！"], "late": ["现在才喝？"], "cold": ["嗯。"], "cold_end": ["行吧，原谅你了。"],
+                  "snooze": ["那就 10 分钟哦"], "cold_badge": ["……"]}
+LINES = dict(_DEFAULT_LINES)
+LINES.update({int(k) if k.isdigit() else k: v for k, v in CHAR.lines("water", {}).items() if v})
 _last_line = {}
 
 
@@ -280,7 +270,7 @@ def draw_fx(p, fx, t, head_x, head_y, h):
         p.setFont(f)
         p.setPen(QColor(120, 128, 150, 200))
         y = head_y - 0.02 * h + math.sin(t * 1.6) * 0.012 * h
-        p.drawText(QRectF(head_x - 0.5 * h, y - 0.06 * h, h, 0.08 * h), Qt.AlignmentFlag.AlignCenter, "省 token 中…")
+        p.drawText(QRectF(head_x - 0.5 * h, y - 0.06 * h, h, 0.08 * h), Qt.AlignmentFlag.AlignCenter, LINES["cold_badge"][0])
     p.restore()
 
 

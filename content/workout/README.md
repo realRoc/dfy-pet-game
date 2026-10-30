@@ -52,11 +52,11 @@
 
 ## 跟练动画
 
-`clips/` 里每段是一个透明 webm（VP9 + alpha），`clips.json` 记着每段在原画面里的位置和帧数，由
+`characters/dafeiyu/workout/clips/` 里每段是一个透明 webm（VP9 + alpha），`clips.json` 记着每段在原画面里的位置和帧数，由
 [`tools/make_workout_clips.py`](../../tools/make_workout_clips.py) 生成：
 
 1. **生成**：TeamoRouter 的 Seedance 2.5 图生视频（`seedance-2-5-image-to-video-basic`，720p，1:1），首尾帧模式。
-   首帧、尾帧都是同一张「中立图」——`sprites/正面.png` 原样放大贴在纯绿幕上——所以每段都从原版站姿开始、
+   首帧、尾帧都是同一张「中立图」——角色包的正面立绘（大肥鱼是 `characters/dafeiyu/sprites/正面.png`）原样放大贴在纯绿幕上——所以每段都从原版站姿开始、
    回到原版站姿：中立 → 动作 / 表情 → 中立。角色就是原图动起来，不让模型重画。
    提示词是统一的前缀（固定机位、纯绿幕、保持参考图的 Q 版二头身和服装、动作软萌 Q 弹）加每段按秒分解的动作描述，
    都写在脚本的 `SPECS` 里。
@@ -91,10 +91,10 @@ macOS 上会用系统的提示音（最后 3 秒滴答、开始、休息、完�
 
 ## 姿势帧
 
-（旧的一套，没装 PyAV 时用。）`frames/` 里每张图是一个姿势，`frames.json` 记着脚底锚点和缩放基准，由
+（旧的一套，没装 PyAV 时用。）`characters/dafeiyu/workout/frames/` 里每张图是一个姿势，`frames.json` 记着脚底锚点和缩放基准，由
 [`tools/make_workout_frames.py`](../../tools/make_workout_frames.py) 从原图生成。
 
-原图是用 ChatGPT 的图片生成（Codex CLI 的 `image_gen`）画的，全部照着 `sprites/正面.png` 的 Q 版比例：
+原图是用 ChatGPT 的图片生成（Codex CLI 的 `image_gen`）画的，全部照着正面立绘的 Q 版比例：
 大约 2.5 头身、头占身高四成、小短腿。提示词是统一的前缀加每个姿势的描述：
 
 > Draw the SAME character in the SAME art style as the reference: a super-deformed Q-version chibi whale-girl maid,
@@ -123,8 +123,8 @@ macOS 上会用系统的提示音（最后 3 秒滴答、开始、休息、完�
 
 ## 授权
 
-跟练动画和姿势帧都是「大肥鱼」形象的衍生图，适用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)
-（署名、非商业、相同方式共享），**不在本仓库代码的 MIT 范围内**。形象署名见 [`content/clips/LICENSE.md`](../clips/LICENSE.md)：
+跟练动画和姿势帧（在 `characters/dafeiyu/workout/` 里）都是「大肥鱼」形象的衍生图，适用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)
+（署名、非商业、相同方式共享），**不在本仓库代码的 MIT 范围内**。形象署名见 [`characters/dafeiyu/clips/LICENSE.md`](../../characters/dafeiyu/clips/LICENSE.md)：
 社区二创的 DeepSeek「大肥鱼」，非 DeepSeek 官方形象；原型「溟月」出自 B 站 @上善无形，DeepSeek 版（女仆鲸鱼娘）设计出自 B 站 @ZipZipPipe。
 
 Kris 那套动作的编排参考 THENX（Chris Heria）的视频，这里只记了动作名和时长，没有用视频里的画面或声音。

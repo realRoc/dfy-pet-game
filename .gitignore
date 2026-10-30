@@ -6,3 +6,5 @@ dist/
 config.json
 .DS_Store
 workouts/
+room.json
+room.json.bad

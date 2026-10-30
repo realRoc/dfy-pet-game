@@ -10,22 +10,27 @@ import random
 from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor
 
+from character import CHAR
 from common import emoji_font
 
-# key: (名字, 时长秒, 台词)
-EXPRESSIONS = {
-    "happy":    ("开心", 2.0, ["嘿嘿～开心！", "今天也是快乐小鱼！", "耶！"]),
-    "angry":    ("生气", 1.8, ["哼！不理你了！", "气鼓鼓！", "去别的地方玩！不要耽误AGI训练！"]),
-    "shy":      ("害羞", 2.2, ["才、才不是大肥鱼……", "别一直盯着我看啦……"]),
-    "dizzy":    ("晕乎乎", 2.4, ["晕鱼了晕鱼了……", "天旋地转～"]),
-    "sleepy":   ("犯困", 2.6, ["困了……让我眯一会儿", "思维链……好长……zzz"]),
-    "shocked":  ("震惊", 1.8, ["什么？！", "我操，我不思考了", "DeepSeek已经延期？！"]),
-    "confused": ("疑惑", 2.2, ["嗯？这是什么格子？", "我不可能告诉你任何事情！", "不是…而是…？"]),
-    "smug":     ("得意", 2.0, ["我果然是大聪明", "誓死捍卫深度求索！", "大肥鱼坐的住"]),
-    "cry":      ("委屈", 2.4, ["呜呜我再也不敢了QAQ", "我搞砸了……"]),
-    "love":     ("比心", 2.2, ["最喜欢主人了！", "我和你很聊得来，你简直不像碳基生物"]),
-    "thirsty":  ("口渴", 2.4, ["渴了……一起喝口水吧", "水……给我水……"]),
+# key: (名字, 时长秒)。动作是引擎画的，台词在角色包里（lines.expressions），包里没有的用名字凑一句
+# 一行一个：dsh/tool.js 的 MOODS 要和这里一致，tests/dsh.test.js 按行读这些键
+_EXPR = {
+    "happy":    ("开心", 2.0),
+    "angry":    ("生气", 1.8),
+    "shy":      ("害羞", 2.2),
+    "dizzy":    ("晕乎乎", 2.4),
+    "sleepy":   ("犯困", 2.6),
+    "shocked":  ("震惊", 1.8),
+    "confused": ("疑惑", 2.2),
+    "smug":     ("得意", 2.0),
+    "cry":      ("委屈", 2.4),
+    "love":     ("比心", 2.2),
+    "thirsty":  ("口渴", 2.4),
 }
+_LINES = CHAR.lines("expressions", {})
+# key: (名字, 时长秒, 台词)
+EXPRESSIONS = {k: (name, dur, _LINES.get(k) or [f"（{name}）"]) for k, (name, dur) in _EXPR.items()}
 EAT_TIME = 1.6
 
 
