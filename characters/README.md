@@ -61,6 +61,8 @@ characters/<id>/
   "persona": {
     "chat_system": "你是桌面宠物……", // AI 聊天的系统提示词
     "chat_placeholder": "给大肥鱼发送消息",
+    "im_system": "你是……",          // 可选：QQ / Discord 机器人（im/）用的人设，写「通过 QQ 和大家聊天」，换平台时自动替换；
+                                     // 不写就用 cordis.patch.yml 里 dfy-qq preset 的人设
     "self": "本鲸"                   // 自称（给以后的模板台词用）
   },
   "lines": { ... }                   // 台词，下面

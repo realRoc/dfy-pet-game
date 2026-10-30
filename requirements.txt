@@ -3,3 +3,4 @@ requests
 av>=13,<20   # 实测 13.1（Python 3.9）到 19.0（Python 3.14）；新大版本先验证解码再放开
 psutil
 nvidia-ml-py; sys_platform == "win32"
+discord.py>=2.4,<3   # IM 机器人（im/）：Discord 直连；QQ 直连用它带的 aiohttp。没装时桌宠照常跑，只是没有「连接 IM」

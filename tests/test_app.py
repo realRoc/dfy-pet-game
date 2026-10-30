@@ -50,7 +50,9 @@ class PetAppSmokeTest(unittest.TestCase):
         pet._on_single_click()
         self.assertTrue(pet.function_panel.isVisible())
         buttons = pet.function_panel.findChildren(QPushButton)
-        self.assertEqual([b.toolTip() for b in buttons], ["聊天", "爬塔", "跟练", "后宅"])
+        # 装了 IM 依赖（discord.py）时最后多一个「连接 IM」，见 test_im.py
+        tips = [b.toolTip() for b in buttons]
+        self.assertEqual(tips, ["聊天", "爬塔", "跟练", "后宅"] + (["连接 IM"] if self.app.im else []))
 
     def test_chat_and_function_panel_are_hidden_windows(self):
         """两个面板有父控件，不带窗口类型就成了桌宠窗口里的子控件：
