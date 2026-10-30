@@ -1,0 +1,54 @@
+:root {
+  --panel: rgba(255, 252, 246, 0.96);
+  --ink: #2c2a26;
+  --muted: #8a8478;
+  --accent: #4f8fd6;
+  --line: rgba(0, 0, 0, 0.08);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #2b3240; color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+#stage { position: fixed; inset: 0; }
+button { font: inherit; color: inherit; cursor: pointer; }
+
+#panel { position: fixed; left: 12px; top: 12px; bottom: 12px; width: 256px; display: flex; flex-direction: column;
+  background: var(--panel); border-radius: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); overflow: hidden; }
+#panel h1 { font-size: 18px; margin: 14px 16px 8px; }
+#tabs { display: flex; gap: 4px; padding: 0 12px 8px; border-bottom: 1px solid var(--line); }
+#tabs button { flex: 1; border: 0; background: transparent; padding: 6px 0; border-radius: 8px; color: var(--muted); }
+#tabs button.on { background: #ece4d4; color: var(--ink); font-weight: 600; }
+#list { flex: 1; overflow-y: auto; padding: 10px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-content: start; }
+.card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 6px;
+  border: 1px solid var(--line); border-radius: 12px; background: #fff; text-align: center; }
+.card:hover { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(79, 143, 214, 0.15); }
+.card img { width: 100%; height: 72px; object-fit: contain; }
+.card .name { font-size: 13px; font-weight: 600; }
+.card .meta { font-size: 11px; color: var(--muted); }
+.card .meta i { font-style: normal; color: #c07a3a; }
+.card .count { position: absolute; top: 6px; right: 6px; font-size: 10px; background: var(--accent); color: #fff;
+  padding: 1px 6px; border-radius: 999px; }
+.card.swatch.on { border-color: var(--accent); }
+.chip { width: 100%; height: 48px; border-radius: 8px; border: 4px solid; }
+
+#sets { position: fixed; right: 12px; top: 12px; width: 220px; padding: 12px 14px; background: var(--panel);
+  border-radius: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); font-size: 12px; }
+#sets .score { font-size: 13px; }
+#sets .score b { font-size: 24px; margin-right: 2px; }
+#sets ul { list-style: none; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); }
+#sets li { display: flex; justify-content: space-between; padding: 3px 0; color: var(--muted); cursor: default; }
+#sets li.done { color: var(--ink); font-weight: 600; }
+
+#toolbar { position: fixed; display: none; gap: 4px; align-items: center; padding: 5px 6px 5px 10px; background: #fff;
+  border-radius: 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); font-size: 12px; }
+#toolbar-name { font-weight: 600; margin-right: 4px; }
+#toolbar button { border: 0; background: #f1ece2; padding: 4px 10px; border-radius: 8px; }
+#toolbar button:hover { background: #e4dccb; }
+#toolbar button[data-act="stash"] { color: #c0392b; }
+
+#hint { position: fixed; left: 280px; right: 280px; bottom: 16px; text-align: center; color: rgba(255, 255, 255, 0.75);
+  font-size: 13px; pointer-events: none; }
+#toast { position: fixed; left: 50%; top: 18px; transform: translate(-50%, -80px); padding: 8px 16px; border-radius: 999px;
+  background: #fff; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); font-size: 14px; font-weight: 600; transition: transform .25s; }
+#toast.show { transform: translate(-50%, 0); }
+#toast.bad { color: #c0392b; }
+.fatal { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; color: #fff; font-size: 16px; line-height: 1.8; }

@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMenu, QMessageBox, QSystemTrayIcon
 
-from common import APP_NAME, SPRITE_DIR, load_config, save_config, relaunch_in_mac_app
+from common import APP_NAME, ICON_PATH, load_config, save_config, relaunch_in_mac_app
 from pet import PetWindow
 
 
@@ -56,6 +56,8 @@ class PetApp:
         self.cfg["x"], self.cfg["y"] = self.pet.x(), self.pet.y()
         save_config(self.cfg)
         self.pet.announcer.stop()
+        if self.pet.room_server:
+            self.pet.room_server.stop()
         self.tray.hide()
         self.qapp.quit()
 
@@ -65,7 +67,7 @@ def main():
     qapp = QApplication(sys.argv)
     qapp.setQuitOnLastWindowClosed(False)
     qapp.setApplicationName(APP_NAME)
-    qapp.setWindowIcon(QIcon(os.path.join(SPRITE_DIR, "icon.png")))
+    qapp.setWindowIcon(QIcon(ICON_PATH))
     app = PetApp(qapp)
     qapp.aboutToQuit.connect(lambda: save_config(app.cfg))
     if os.environ.get("DFY_CONTROL") == "stdin":  # 作为 dsh 插件的子进程跑

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>后宅</title>
+</head>
+<body>
+  <div id="stage"></div>
+  <aside id="panel">
+    <h1>🏠 后宅</h1>
+    <nav id="tabs">
+      <button data-tab="items" class="on">家具</button>
+      <button data-tab="walls">墙纸</button>
+      <button data-tab="floors">地板</button>
+    </nav>
+    <div id="list"></div>
+  </aside>
+  <section id="sets"></section>
+  <div id="toolbar">
+    <span id="toolbar-name"></span>
+    <button data-act="move">移动</button>
+    <button data-act="rotate">旋转</button>
+    <button data-act="stash">收起</button>
+  </div>
+  <div id="hint"></div>
+  <div id="toast"></div>
+  <script type="module" src="./src/main.ts"></script>
+</body>
+</html>

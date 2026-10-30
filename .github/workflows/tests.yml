@@ -47,6 +47,29 @@ jobs:
             exit 1
           }
 
+  # 后宅网页：几何和摆放规则测试（vitest）、类型检查 + 打包，再确认提交的 content/room 是最新打包
+  room:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: room
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: room/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run release
+      - name: content/room 是最新打包
+        run: |
+          git diff --stat --exit-code -- ../content/room || {
+            echo "::error::content/room 和源码打出来的不一致：在 room/ 里跑 npm run release 再提交 content/room/"
+            exit 1
+          }
+
   # dsh 插件的 Node 部分（QQ 工具参数校验、桌宠指令冷却），再确认 npm 包里带上了插件和桌宠需要的文件
   dsh-plugin:
     runs-on: ubuntu-latest
@@ -62,7 +85,8 @@ jobs:
           node -e '
             const files = new Set(JSON.parse(require("fs").readFileSync("pack.json"))[0].files.map((f) => f.path))
             const need = ["package.json", "cordis.patch.yml", "dsh/index.js", "dsh/tool.js", "dsh/locale/zh.json",
-              "main.py", "control.py", "requirements.txt", "sprites/icon.png", "content/tower/index.html"]
+              "main.py", "control.py", "requirements.txt", "characters/dafeiyu/character.json", "characters/dafeiyu/sprites/icon.png", "content/tower/index.html",
+              "room.py", "character.py", "content/room/index.html", "content/room/catalog.json"]
             const missing = need.filter((f) => !files.has(f))
             if (missing.length) { console.error("npm 包缺文件:", missing); process.exit(1) }
-            if ([...files].some((f) => f.startsWith("tower/") || f.startsWith("tests/"))) { console.error("npm 包带了不该带的目录"); process.exit(1) }'
+            if ([...files].some((f) => f.startsWith("tower/") || f.startsWith("room/") || f.startsWith("tests/"))) { console.error("npm 包带了不该带的目录"); process.exit(1) }'

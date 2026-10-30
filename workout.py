@@ -23,11 +23,13 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QPixmap
 
 import clips as clip_lib
+from character import CHAR
 from common import BUNDLE_DIR, DATA_DIR, IS_MAC, IS_WIN, emoji_font
 
 WORKOUT_DIR = os.path.join(BUNDLE_DIR, "content", "workout")
-FRAME_DIR = os.path.join(WORKOUT_DIR, "frames")
-CLIP_DIR = os.path.join(WORKOUT_DIR, "clips")
+# 姿势帧和跟练动画是角色的素材，在角色包里；训练计划和角色无关，留在 content/workout/plans
+FRAME_DIR = CHAR.anim_dir("workout_frames") or ""
+CLIP_DIR = CHAR.anim_dir("workout") or ""
 CLIP_FADE = 0.15   # 片段开头结尾和正面图叠化几秒：视频比原画软一点，硬切会闪一下；左边的镜像也靠它带过去
 BUILTIN_PLAN_DIR = os.path.join(WORKOUT_DIR, "plans")
 USER_PLAN_DIR = os.path.join(DATA_DIR, "workouts")
@@ -71,11 +73,11 @@ class Move:
     """一个原子动作：keys 是一次动作（一个 rep）的时间轴，循环播放。
     帧默认朝左（侧面图）或正面；side="left" 时整套镜像。"""
 
-    def __init__(self, label, keys, cue, tip="", persona=False, fx=None, still=None):
+    def __init__(self, label, keys, tip="", persona=False, fx=None, still=None):
         self.label = label
         self.keys = keys
         self.rep = sum(k.hold for k in keys)
-        self.cue = cue          # 开始时说的话
+        self.cue = label        # 开始时说的话：角色包的 lines.workout.cues 里配，见 MOVES 下面
         self.tip = tip          # 动作要领
         self.persona = persona  # 大肥鱼人设动作（不是正经训练动作）
         self.fx = fx            # 头顶符号：sweat / shake / zzz / sparkle / rice
@@ -114,39 +116,39 @@ def _lunge(mirror):
 MOVES = {
     # ---------- 训练动作 ----------
     "squat_open_close": Move("开合深蹲", _squat("squat_wide", "squat_wide_half") + _squat("squat_narrow", "squat_narrow_half"),
-                             "开合深蹲！宽一下窄一下～", "宽站距、窄站距交替，膝盖跟脚尖同向", still="lazy_squat"),
-    "squat": Move("深蹲", _squat("squat_wide", "squat_wide_half"), "深蹲，屁股往后坐！", "背挺直，蹲到大腿和地面平行",
+                             "宽站距、窄站距交替，膝盖跟脚尖同向", still="lazy_squat"),
+    "squat": Move("深蹲", _squat("squat_wide", "squat_wide_half"), "背挺直，蹲到大腿和地面平行",
                   still="lazy_squat"),
     "curtsy_lunge": Move("屈膝礼弓步", [
         Key("stand", 0.45, pulse=(0.008, 1.4)),
         Key("stand", 0.14, sy=1.03, dy=-0.012, tween=0.12, ease="out"),       # 踮一下脚
         Key("curtsy", 0.80, fade=0.1, ease="out", land=0.6, rot=-2.0, pulse=(0.006, 1.6)),   # 优雅地慢慢屈下去
         Key("stand", 0.35, fade=0.08, sy=1.02, land=0.3, ease="out"),
-    ], "女仆屈膝礼，其实是弓步蹲哦", "后腿斜着交叉到身后，前膝不内扣", still="lazy_squat"),
-    "lunge": Move("弓步蹲", _lunge(False) + _lunge(True), "左右交替弓步蹲！", "前膝 90°，后膝快碰地，上身直立",
+    ], "后腿斜着交叉到身后，前膝不内扣", still="lazy_squat"),
+    "lunge": Move("弓步蹲", _lunge(False) + _lunge(True), "前膝 90°，后膝快碰地，上身直立",
                   still="lazy_squat"),
     "deadlift": Move("硬拉", [
         Key("lift", 0.45, pulse=(0.008, 1.4)),
         Key("lift", 0.16, sy=0.98, tween=0.14),                                # 收紧核心
         Key("hinge", 0.85, fade=0.12, tween=0.6, ease="inout", land=0.4, pulse=(0.005, 2.0)),   # 慢慢放下去（离心）
         Key("lift", 0.40, smear=True, sy=1.03, tween=0.12, ease="out", land=0.5),   # 一口气拉起来
-    ], "硬拉电饭煲！背要平！", "屈髋往后推，背保持平直，没哑铃就拎个电饭煲", still="lazy_squat"),
+    ], "屈髋往后推，背保持平直，没哑铃就拎个电饭煲", still="lazy_squat"),
     "glute_bridge": Move("臀桥", [
         Key("bridge_down", 0.50, pulse=(0.008, 1.2)),
         Key("bridge_up", 0.65, ease="out", land=0.5, shake=0.003),             # 顶上去夹臀，微微发抖
         Key("bridge_down", 0.40, fade=0.1, ease="inout"),                      # 慢慢放下
-    ], "躺下，臀桥！", "顶髋到最高点夹臀停一下", still="collapse"),
+    ], "顶髋到最高点夹臀停一下", still="collapse"),
     "glute_bridge_single": Move("单腿臀桥", [
         Key("bridge_down", 0.50, pulse=(0.008, 1.2)),
         Key("bridge_single", 0.70, ease="out", land=0.5, shake=0.004),
         Key("bridge_down", 0.45, fade=0.1, ease="inout"),
-    ], "单腿臀桥，一条腿抬起来！", "抬起的腿伸直，支撑腿发力顶髋", still="collapse"),
+    ], "抬起的腿伸直，支撑腿发力顶髋", still="collapse"),
     "wall_sit": Move("靠墙静蹲", [
         Key("wall_sit", 3.2, pulse=(0.006, 1.1), shake=0.004),
         Key("wall_sit", 0.25, dy=0.012, sy=0.99, tween=0.08, ease="in", shake=0.006),   # 腿一软往下滑一点
         Key("wall_sit", 0.6, tween=0.35, ease="out", land=0.4, shake=0.005),             # 又顶回去
-    ], "靠墙静蹲，坚持住！", "大腿和地面平行，背贴墙，别憋气", fx="shake", still="tired"),
-    # ---------- 大肥鱼人设动作 ----------
+    ], "大腿和地面平行，背贴墙，别憋气", fx="shake", still="tired"),
+    # ---------- 人设动作（台词在角色包里） ----------
     "stand": Move("站好", [
         Key("stand", 1.3, pulse=(0.008, 1.3)),
         Key("stand", 0.6, rot=1.2, tween=0.5),                                 # 重心左右换一换
@@ -154,45 +156,49 @@ MOVES = {
         Key("stand", 0.16, dy=-0.035, sy=1.03, tween=0.12, ease="out"),
         Key("stand", 0.5, land=0.6, tween=0.12, ease="in", pulse=(0.008, 1.3)),
         Key("stand", 0.6, rot=-1.2, tween=0.5),
-    ], "准备好了吗？", persona=True),
+    ], persona=True),
     "tired": Move("累了", [
         Key("tired", 1.2, pulse=(0.028, 2.6)),                                 # 大喘气
         Key("tired", 0.5, rot=2.0, tween=0.4, pulse=(0.02, 2.2)),
         Key("tired", 0.5, rot=-1.0, tween=0.4, pulse=(0.02, 2.2)),
-    ], "呼……呼……累死鱼了", "大口喘气，别停下来走两步", persona=True, fx="sweat"),
+    ], "大口喘气，别停下来走两步", persona=True, fx="sweat"),
     "collapse": Move("瘫倒", [
         Key("collapse", 2.4, pulse=(0.012, 0.6)),
         Key("collapse", 0.12, sy=1.03, tween=0.05, ease="out"),                # 抽一下
         Key("collapse", 1.5, land=0.6, pulse=(0.012, 0.6)),
-    ], "我不行了……让我躺会儿", persona=True),
+    ], persona=True),
     "slack": Move("偷懒干饭", [
         Key("slack", 1.4, pulse=(0.012, 4.0)),                                 # 嚼嚼嚼
         Key("slack", 0.5, rot=-2.5, tween=0.25, pulse=(0.004, 1.0)),           # 偷瞄一眼
         Key("slack", 0.9, tween=0.25, pulse=(0.012, 4.0)),
-    ], "（偷偷干一碗饭……）", persona=True, fx="rice"),
+    ], persona=True, fx="rice"),
     "lazy_squat": Move("假装在练", [
         Key("lazy_squat", 0.9, dy=0.008, sy=0.99, tween=0.8, ease="inout"),    # 有气无力地蹲一点点
         Key("lazy_squat", 0.9, tween=0.8, ease="inout"),
         Key("lazy_squat", 0.8, rot=1.5, tween=0.4),                            # 刷手机刷入迷，歪一下
-    ], "（我在练，我在练……）", persona=True, fx="zzz"),
+    ], persona=True, fx="zzz"),
     "drink": Move("喝水", [
         Key("drink", 0.7, pulse=(0.008, 1.3)),
         Key("drink", 1.3, rot=-3.5, dy=-0.005, tween=0.35, pulse=(0.012, 2.6)),   # 仰头咕咚咕咚
         Key("drink", 0.25, rot=0.0, tween=0.2, ease="out", land=0.4),            # 哈～
         Key("drink", 0.8, pulse=(0.008, 1.3)),
-    ], "喝口水，歇一下～", "调整呼吸，喝小口水", persona=True),
+    ], "调整呼吸，喝小口水", persona=True),
     "cheer": Move("欢呼", [
         Key("cheer", 0.20),
         Key("cheer", 0.10, sy=0.93, tween=0.08, ease="in"),                    # 蓄力：先压低
         Key("cheer", 0.26, dy=-0.09, sy=1.06, tween=0.22, ease="out", smear=True),   # 蹦起来
         Key("cheer", 0.10, sy=0.94, tween=0.1, ease="in"),                     # 落地
         Key("cheer", 0.30, land=0.8, tween=0.12, ease="out"),
-    ], "练完啦！大肥鱼最棒！", persona=True, fx="sparkle"),
+    ], persona=True, fx="sparkle"),
 }
+
+for _k, _cue in CHAR.lines("workout.cues", {}).items():
+    if _k in MOVES:
+        MOVES[_k].cue = _cue
 
 SIDE_LABEL = {"left": "左", "right": "右"}
 
-SLACK_LINES = ["就偷懒一下下……", "主人没在看吧……", "先干口饭再说", "摸鱼，鱼的本能"]   # 心声，气泡自己会加括号
+SLACK_LINES = CHAR.lines("workout.slack", ["就偷懒一下下……"])   # 心声，气泡自己会加括号
 
 # ---------- 跟练动画 ----------
 # 躺着 / 蹲着练的姿势：(进入那段, 起身那段)。进入那段从站姿到这个姿势，起身那段回到站姿
@@ -215,21 +221,13 @@ MOVE_CLIPS = {
     "drink": (None, "drink"),
     "cheer": (None, "cheer"),
 }
-# 偷懒的片段：(开始偷懒时的心声, 被发现时说的话, 第几秒被发现)。每段都是 中立 → 偷懒 → 被发现 → 中立
-LAZY = {
-    "lazy_doze": ("眼皮好重……就眯一下", "没睡！我没睡！", 3.5),
-    "lazy_phone": ("就看一眼消息……", "我在查动作要领！", 4.0),
-    "lazy_rice": ("先干口饭再说", "吃饱了才有力气练！", 4.5),
-    "lazy_think": ("让我深度思考一下……", "已思考 3 秒，继续练！", 4.2),
-    "lazy_flop": ("躺平，鱼的本能", "被发现了！继续继续！", 4.2),
-    "lazy_fish": ("偷吃一口小鱼干……", "没吃！嘴里什么都没有！", 4.2),
-    "lazy_fake": ("我在练，我在练……", "这次认真练！", 4.2),
-    "lazy_tailnap": ("抱着尾巴睡一会儿……", "我醒着！我醒着！", 4.8),
-}
+# 偷懒的片段：(开始偷懒时的心声, 被发现时说的话, 第几秒被发现)。每段都是 中立 → 偷懒 → 被发现 → 中立。
+# 片段和台词、被发现的时刻是一起做的，都在角色包里（lines.workout.lazy）
+LAZY = {name: (v["thought"], v["caught"], v["caught_at"]) for name, v in CHAR.lines("workout.lazy", {}).items()}
 CLIP_SLACK_CHANCE = 0.55   # 20 秒以上的站着练的动作，有多大概率中途偷懒一次
-CAUGHT_LINES = ["被发现了！继续继续！", "我没偷懒！我在思考！", "已思考 3 秒，继续练！"]
-LAST_LINES = ["最后 10 秒！", "坚持住！快到了！", "腿在抖了！别停！"]
-REST_LINES = ["休息 {s} 秒，下一个：{next}", "喘口气，下一个：{next}"]
+CAUGHT_LINES = CHAR.lines("workout.caught", ["被发现了！继续继续！"])
+LAST_LINES = CHAR.lines("workout.last", ["最后 10 秒！"])
+REST_LINES = CHAR.lines("workout.rest", ["休息 {s} 秒，下一个：{next}"])
 
 
 # ---------- 训练计划 ----------
@@ -516,8 +514,8 @@ class ClipDirector:
         if posture and self.posture is None:
             self.posture = posture
             return POSTURES[posture][0], False
-        if lazy and self.posture is None:
-            name = random.choice([n for n in LAZY if n != self.last_lazy])
+        if lazy and LAZY and self.posture is None:
+            name = random.choice([n for n in LAZY if n != self.last_lazy] or list(LAZY))
             self.last_lazy = name
             return name, False
         # 躺着 / 蹲着的姿势首尾接的是进入那段的最后一帧，翻过来就接不上了，只有站着的动作能镜像

@@ -1,6 +1,6 @@
 """把生成好的跟练姿势图整理成素材：python tools/make_workout_frames.py <原图目录>
 
-原图是用 ChatGPT 的图片生成（Codex CLI 的 image_gen，参考 sprites/正面.png）一张张画的透明 PNG，
+原图是用 ChatGPT 的图片生成（Codex CLI 的 image_gen，参考角色包的正面立绘）一张张画的透明 PNG，
 每个姿势一张，文件名就是帧名（stand.png、squat_wide.png……），提示词见 content/workout/README.md。
 生成出来的人物大小、留白各不相同，这里逐张：
 - 按 alpha 裁掉空白
@@ -8,7 +8,7 @@
   运行时按桌宠身高 / unit 缩放，蹲着、躺着的图和站着的一样大
 - 记下脚底锚点：默认是外框底边中点，侧身的图（尾巴、电饭煲伸出去）用 ax 指定身体中线在外框里的位置
 
-产物放 content/workout/frames/：每帧一个 PNG，外加 frames.json。只用 PySide6，不需要别的库。
+产物放角色包的 workout_frames 目录：每帧一个 PNG，外加 frames.json。只用 PySide6，不需要别的库。
 """
 import json
 import os
@@ -20,7 +20,9 @@ from PySide6.QtGui import QImage   # noqa: E402
 from PySide6.QtWidgets import QApplication   # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(ROOT, "content", "workout", "frames")
+sys.path.insert(0, ROOT)
+from character import CHAR   # noqa: E402  产物写进当前角色包（DFY_CHARACTER，默认 dafeiyu）
+OUT_DIR = CHAR.anim_dir("workout_frames") or CHAR.path("workout/frames")
 UNIT = 560          # 站直时的身高（像素）：最大号桌宠在 2x 屏上约 612，够用且不太占仓库
 ALPHA_MIN = 16
 PAD = 2
