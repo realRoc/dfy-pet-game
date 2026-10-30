@@ -18,6 +18,12 @@ else:
     _SKIP = ""
 
 
+def far_away(pet):
+    """挪到离屏幕老远的地方。offscreen 屏幕只有 800 见方，窗口占了快一半，随机目标偶尔就落在脚下 12px 内，
+    同一帧就算「走到了」把目标清掉；挪远了才稳定看得到刚挑的目标。"""
+    pet.move(-5000, -5000)
+
+
 @unittest.skipIf(_SKIP, _SKIP)
 class WanderTest(unittest.TestCase):
     def setUp(self):
@@ -41,6 +47,7 @@ class WanderTest(unittest.TestCase):
         geo = (pet.screen() or QApplication.primaryScreen()).availableGeometry()
         for _ in range(50):
             pet.target, pet.rest_until = None, 0
+            far_away(pet)
             pet.tick()
             cx, cy = pet.target
             self.assertGreaterEqual(cx - pet.width() / 2, geo.left())
@@ -51,6 +58,7 @@ class WanderTest(unittest.TestCase):
     def test_blocked_walk_gives_up_and_rests(self):
         pet = self.pet
         pet.rest_until = 0
+        far_away(pet)
         pet.tick()
         self.assertIsNotNone(pet.target)
         with mock.patch.object(pet, "move"):   # 系统把窗口挡住：怎么 move 都不动
