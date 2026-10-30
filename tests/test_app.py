@@ -45,12 +45,12 @@ class PetAppSmokeTest(unittest.TestCase):
         self.assertIn("退出", texts)
         self.assertFalse(any("飞行棋" in t for t in texts), texts)
 
-    def test_single_click_panel_has_chat_tower_workout(self):
+    def test_single_click_panel_has_chat_tower_workout_room(self):
         pet = self.app.pet
         pet._on_single_click()
         self.assertTrue(pet.function_panel.isVisible())
         buttons = pet.function_panel.findChildren(QPushButton)
-        self.assertEqual([b.toolTip() for b in buttons], ["聊天", "爬塔", "跟练"])
+        self.assertEqual([b.toolTip() for b in buttons], ["聊天", "爬塔", "跟练", "后宅"])
 
     def test_chat_and_function_panel_are_hidden_windows(self):
         """两个面板有父控件，不带窗口类型就成了桌宠窗口里的子控件：

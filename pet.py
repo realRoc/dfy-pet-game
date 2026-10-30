@@ -6,6 +6,7 @@
 - 新增 dsh-pet 的动作动画（舞狮、玩玩具汽车……，clips.py），放进「做个表情」，闲着时也会自己播
 - 新增健身跟练（workout.py）：按训练计划做动作、报下一个，右上角两位数倒计时（红色练、绿色歇）
 - 新增喝水提醒（water.py）：到点递水壶，不理就一级级加码，最后扔大水砸碎屏幕、气跑，过一会儿再回来
+- 新增后宅（room.py + room/ 网页）：摆家具、凑套装，舒适度越高，闲着时越常做开心的表情
 - 天气查询改到后台线程，不卡界面
 """
 import datetime
@@ -25,7 +26,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QMenu, QSystemTrayIcon, QM
                                QInputDialog, QLineEdit, QHBoxLayout, QVBoxLayout, QPushButton,
                                QFrame, QDialog, QToolButton)
 
-from common import (APP_DIR, APP_NAME, ICON_PATH, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
+from common import (APP_DIR, APP_NAME, DATA_DIR, ICON_PATH, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
                     emoji_font, float_flags, load_sprites, pix_size)
 from expressions import EXPRESSIONS, ExpressionPlayer
 import clips
@@ -33,6 +34,7 @@ from clips import ClipPlayer
 import workout
 from workout import WorkoutPlayer, FrameCache, Announcer
 import water
+import room
 from character import CHAR
 
 try:
@@ -63,6 +65,7 @@ INNER_LINES = CHAR.lines("inner")
 DRAG_LINES = CHAR.lines("drag")
 FOOD_LINES = CHAR.lines("food", {})
 SYSTEM_LINES = CHAR.lines("system", {})
+MOOD_EXPRESSIONS = ["happy", "love", "smug"]   # 后宅舒服时闲着更常做的表情
 FOODS = ["🐟", "🍰", "🍭", "🍡", "💎"]
 
 # 自启项的名字沿用飞行棋时期的，已经开过自启的用户关掉时还能删到
@@ -148,16 +151,16 @@ class ChatDialog(QDialog):
 
 
 class FunctionPanel(QFrame):
-    """单击弹出的功能列表：聊天 / 爬塔"""
+    """单击弹出的功能列表：聊天 / 爬塔 / 跟练 / 后宅"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(float_flags())
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(176, 60)
+        self.setFixedSize(232, 60)
 
         # 顶层透明窗口自己的样式表背景画不出来，白底圆角画在里面这层上（和 ChatDialog 一样）
         container = QFrame(self)
-        container.setGeometry(0, 0, 176, 60)
+        container.setGeometry(0, 0, 232, 60)
         container.setStyleSheet("""
             QFrame {
                 background: rgba(255, 255, 255, 0.92);
@@ -178,7 +181,7 @@ class FunctionPanel(QFrame):
         layout.setSpacing(2)
 
         for icon, tip, fn in (("🗨️", "聊天", self._on_chat_clicked), ("🗼", "爬塔", self._on_tower_clicked),
-                              ("🏋️", "跟练", self._on_workout_clicked)):
+                              ("🏋️", "跟练", self._on_workout_clicked), ("🏠", "后宅", self._on_room_clicked)):
             b = QPushButton(icon)
             b.setFont(emoji_font(26))
             b.setToolTip(tip)
@@ -201,6 +204,11 @@ class FunctionPanel(QFrame):
         self.hide()
         if self.parent():
             self.parent().show_workout_menu()
+
+    def _on_room_clicked(self):
+        self.hide()
+        if self.parent():
+            self.parent().open_room()
 
     def popup_at(self, x, y):
         self.move(int(x), int(y))
@@ -283,6 +291,9 @@ class PetWindow(QWidget):
         self._water_idle = 0.0
         self._water_idle_left = 0.0
         self._last_offer = None
+        # 后宅：布局存档一启动就读（舒适度影响心情），网页服务等第一次打开后宅再起
+        self.room = room.RoomStore(os.path.join(DATA_DIR, "room.json"))
+        self.room_server = None
         self._layout_for_size()
 
         # 状态
@@ -1146,8 +1157,8 @@ class PetWindow(QWidget):
             elif pick < 0.65:
                 self.action, self.action_t = "stretch", 1.0
             elif pick < 0.7:
-                # 偶尔自己冒个表情，不说话
-                self.expr.start()
+                # 偶尔自己冒个表情，不说话；后宅越舒服，越常是开心类的
+                self.expr.start(self._mood_expression())
             elif pick < 0.8:
                 if not (clips.AVAILABLE and self.play_clip()):
                     self.expr.start()
@@ -1377,11 +1388,36 @@ class PetWindow(QWidget):
             print("爬塔打开失败:", TOWER_HTML)
             self.say("浏览器没打开，手动打开 content/tower/index.html")
 
+    def _mood_expression(self):
+        """闲着时挑哪个表情：后宅舒适度满级时有六成是开心类的，空房间就全随机。"""
+        if random.random() < 0.6 * room.mood_bonus(self.room.comfort()):
+            return random.choice(MOOD_EXPRESSIONS)
+        return None
+
+    def open_room(self):
+        """在系统浏览器里打开后宅。数据在桌宠这边（room.json），网页通过本机的小服务读写。"""
+        try:
+            if self.room_server is None:
+                self.room_server = room.RoomServer(room.RoomAPI(self.room)).start()
+        except OSError as e:
+            print("后宅服务起不来:", e)
+            self.say("后宅打不开，过会儿再试试")
+            return
+        if not os.path.isfile(room.PAGE_PATH):
+            self.say("后宅还没打包，先在 room/ 里 npm run release")
+            return
+        if QDesktopServices.openUrl(QUrl(self.room_server.url())):
+            self.say("回后宅看看～")
+        else:
+            print("后宅打开失败:", self.room_server.url())
+            self.say("浏览器没打开")
+
     def _build_menu(self):
         return self._fill_menu(QMenu(self))
 
     def _fill_menu(self, m):
         m.addAction("🗼 爬塔", self.open_tower)
+        m.addAction("🏠 后宅", self.open_room)
         self._add_workout_menu(m)
         self._add_water_menu(m)
         m.addSeparator()

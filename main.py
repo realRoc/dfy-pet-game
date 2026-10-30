@@ -56,6 +56,8 @@ class PetApp:
         self.cfg["x"], self.cfg["y"] = self.pet.x(), self.pet.y()
         save_config(self.cfg)
         self.pet.announcer.stop()
+        if self.pet.room_server:
+            self.pet.room_server.stop()
         self.tray.hide()
         self.qapp.quit()
 

@@ -1,0 +1,166 @@
+{
+  "format": 1,
+  "license": {
+    "spdx": "MIT",
+    "commercial": true,
+    "source": "本项目原创：家具都是 room/ 网页里按下面的 boxes（等距长方体）用代码画的，没有用任何外部素材或角色形象"
+  },
+  "room": {"w": 8, "d": 8},
+  "poses": {
+    "sit": {"label": "坐着"},
+    "lie": {"label": "躺着"},
+    "sleep": {"label": "睡觉"},
+    "read": {"label": "看书"},
+    "exercise": {"label": "锻炼"},
+    "drink": {"label": "喝水"}
+  },
+  "comfort_levels": [
+    {"min": 0, "name": "空荡荡"},
+    {"min": 30, "name": "有点样子"},
+    {"min": 70, "name": "舒服"},
+    {"min": 120, "name": "温馨"},
+    {"min": 180, "name": "超温馨"}
+  ],
+  "wallpapers": [
+    {"id": "wall_cream", "name": "奶油白", "color": "#f4ead8", "trim": "#d9c7a8"},
+    {"id": "wall_sea", "name": "浅海蓝", "color": "#cfe6f2", "trim": "#8fb9d1"},
+    {"id": "wall_mint", "name": "薄荷绿", "color": "#d6efe0", "trim": "#9ccdb0"},
+    {"id": "wall_dusk", "name": "黄昏粉", "color": "#f6d9d9", "trim": "#d9a3a3"}
+  ],
+  "floors": [
+    {"id": "floor_wood", "name": "原木地板", "color": "#c89f72", "alt": "#bb9165"},
+    {"id": "floor_tile", "name": "白瓷砖", "color": "#e8e8ea", "alt": "#dcdce0"},
+    {"id": "floor_sand", "name": "沙滩", "color": "#ecd9a8", "alt": "#e3cd96"}
+  ],
+  "sets": [
+    {"id": "seaside", "name": "海边小屋", "bonus": 40},
+    {"id": "study", "name": "安静书房", "bonus": 30},
+    {"id": "gym", "name": "健身角", "bonus": 30}
+  ],
+  "items": [
+    {
+      "id": "shell_bed", "name": "贝壳床", "set": "seaside", "comfort": 30, "size": [2, 3], "layer": "object",
+      "boxes": [
+        {"at": [0, 0, 0], "size": [2, 3, 0.35], "color": "#f2c6c6"},
+        {"at": [0.1, 0.1, 0.35], "size": [1.8, 2.8, 0.2], "color": "#fbf3e8"},
+        {"at": [0.25, 0.2, 0.55], "size": [1.5, 0.6, 0.18], "color": "#ffffff"},
+        {"at": [0, 0, 0.35], "size": [2, 0.15, 0.9], "color": "#e7a9a9"}
+      ],
+      "slots": [{"pose": "sleep", "at": [1, 1.6]}, {"pose": "lie", "at": [1, 1.6]}]
+    },
+    {
+      "id": "driftwood_table", "name": "浮木小桌", "set": "seaside", "comfort": 12, "size": [2, 2], "layer": "object",
+      "boxes": [
+        {"at": [0.2, 0.2, 0], "size": [0.2, 0.2, 0.5], "color": "#9a7552"},
+        {"at": [1.6, 0.2, 0], "size": [0.2, 0.2, 0.5], "color": "#9a7552"},
+        {"at": [0.2, 1.6, 0], "size": [0.2, 0.2, 0.5], "color": "#9a7552"},
+        {"at": [1.6, 1.6, 0], "size": [0.2, 0.2, 0.5], "color": "#9a7552"},
+        {"at": [0.05, 0.05, 0.5], "size": [1.9, 1.9, 0.12], "color": "#b9916a"},
+        {"at": [0.8, 0.8, 0.62], "size": [0.4, 0.4, 0.3], "color": "#7fc4e0"}
+      ],
+      "slots": [{"pose": "drink", "at": [1, 2.3]}]
+    },
+    {
+      "id": "coral_stool", "name": "珊瑚凳", "set": "seaside", "comfort": 8, "size": [1, 1], "layer": "object", "stack": 2,
+      "boxes": [
+        {"at": [0.3, 0.3, 0], "size": [0.4, 0.4, 0.3], "color": "#ef8a76"},
+        {"at": [0.15, 0.15, 0.3], "size": [0.7, 0.7, 0.12], "color": "#f4a08f"}
+      ],
+      "slots": [{"pose": "sit", "at": [0.5, 0.5], "z": 0.42}]
+    },
+    {
+      "id": "lifebuoy_rug", "name": "救生圈地毯", "set": "seaside", "comfort": 10, "size": [2, 2], "layer": "rug",
+      "boxes": [
+        {"at": [0, 0, 0], "size": [2, 2, 0.03], "color": "#ffffff"},
+        {"at": [0, 0, 0.03], "size": [1, 1, 0.01], "color": "#e95b5b"},
+        {"at": [1, 1, 0.03], "size": [1, 1, 0.01], "color": "#e95b5b"},
+        {"at": [0.7, 0.7, 0.04], "size": [0.6, 0.6, 0.01], "color": "#c9a87c"}
+      ]
+    },
+    {
+      "id": "lighthouse_lamp", "name": "灯塔落地灯", "set": "seaside", "comfort": 10, "size": [1, 1], "layer": "object",
+      "boxes": [
+        {"at": [0.25, 0.25, 0], "size": [0.5, 0.5, 0.4], "color": "#ffffff"},
+        {"at": [0.3, 0.3, 0.4], "size": [0.4, 0.4, 0.4], "color": "#e95b5b"},
+        {"at": [0.3, 0.3, 0.8], "size": [0.4, 0.4, 0.4], "color": "#ffffff"},
+        {"at": [0.28, 0.28, 1.2], "size": [0.44, 0.44, 0.25], "color": "#ffe27a"},
+        {"at": [0.25, 0.25, 1.45], "size": [0.5, 0.5, 0.1], "color": "#e95b5b"}
+      ]
+    },
+    {
+      "id": "study_desk", "name": "书桌", "set": "study", "comfort": 14, "size": [2, 1], "layer": "object",
+      "boxes": [
+        {"at": [0, 0, 0], "size": [0.5, 1, 0.6], "color": "#8b6b4a"},
+        {"at": [1.85, 0, 0], "size": [0.15, 1, 0.6], "color": "#8b6b4a"},
+        {"at": [0, 0, 0.6], "size": [2, 1, 0.1], "color": "#a8845d"},
+        {"at": [1.3, 0.15, 0.7], "size": [0.4, 0.3, 0.35], "color": "#fff1b8"},
+        {"at": [0.6, 0.2, 0.7], "size": [0.5, 0.35, 0.06], "color": "#5d8fc9"}
+      ],
+      "slots": [{"pose": "read", "at": [1, 1.5]}]
+    },
+    {
+      "id": "bookshelf", "name": "书架", "set": "study", "comfort": 16, "size": [2, 1], "layer": "object",
+      "boxes": [
+        {"at": [0, 0, 0], "size": [2, 0.6, 1.9], "color": "#7a5a3c"},
+        {"at": [0.1, 0.45, 0.15], "size": [0.5, 0.16, 0.45], "color": "#d9534f"},
+        {"at": [0.65, 0.45, 0.15], "size": [0.6, 0.16, 0.4], "color": "#4f86c6"},
+        {"at": [1.3, 0.45, 0.15], "size": [0.55, 0.16, 0.5], "color": "#5cb85c"},
+        {"at": [0.1, 0.45, 0.8], "size": [0.8, 0.16, 0.42], "color": "#f0ad4e"},
+        {"at": [1, 0.45, 0.8], "size": [0.85, 0.16, 0.45], "color": "#9b72cf"},
+        {"at": [0.1, 0.45, 1.4], "size": [1.75, 0.16, 0.38], "color": "#e6e1d6"}
+      ]
+    },
+    {
+      "id": "swivel_chair", "name": "转椅", "set": "study", "comfort": 8, "size": [1, 1], "layer": "object",
+      "boxes": [
+        {"at": [0.4, 0.4, 0], "size": [0.2, 0.2, 0.4], "color": "#555b66"},
+        {"at": [0.1, 0.1, 0.4], "size": [0.8, 0.8, 0.12], "color": "#3f6fb0"},
+        {"at": [0.1, 0.1, 0.52], "size": [0.8, 0.12, 0.6], "color": "#3f6fb0"}
+      ],
+      "slots": [{"pose": "sit", "at": [0.5, 0.55], "z": 0.52}]
+    },
+    {
+      "id": "beanbag", "name": "懒人沙发", "set": "study", "comfort": 12, "size": [1, 1], "layer": "object",
+      "boxes": [
+        {"at": [0.05, 0.05, 0], "size": [0.9, 0.9, 0.35], "color": "#f2b84b"},
+        {"at": [0.05, 0.05, 0.35], "size": [0.9, 0.3, 0.3], "color": "#e8a933"}
+      ],
+      "slots": [{"pose": "sit", "at": [0.5, 0.6], "z": 0.3}, {"pose": "read", "at": [0.5, 0.6], "z": 0.3}]
+    },
+    {
+      "id": "yoga_mat", "name": "瑜伽垫", "set": "gym", "comfort": 8, "size": [1, 2], "layer": "rug",
+      "boxes": [{"at": [0.1, 0.05, 0], "size": [0.8, 1.9, 0.04], "color": "#8fd1b5"}],
+      "slots": [{"pose": "exercise", "at": [0.5, 1]}, {"pose": "lie", "at": [0.5, 1]}]
+    },
+    {
+      "id": "dumbbell_rack", "name": "哑铃架", "set": "gym", "comfort": 8, "size": [1, 1], "layer": "object",
+      "boxes": [
+        {"at": [0.1, 0.3, 0], "size": [0.8, 0.4, 0.5], "color": "#6b7280"},
+        {"at": [0.15, 0.25, 0.5], "size": [0.2, 0.5, 0.15], "color": "#2f343c"},
+        {"at": [0.65, 0.25, 0.5], "size": [0.2, 0.5, 0.15], "color": "#2f343c"}
+      ],
+      "slots": [{"pose": "exercise", "at": [0.5, 1.3]}]
+    },
+    {
+      "id": "water_cooler", "name": "饮水机", "set": "gym", "comfort": 10, "size": [1, 1], "layer": "object",
+      "boxes": [
+        {"at": [0.2, 0.2, 0], "size": [0.6, 0.6, 0.8], "color": "#f1f3f5"},
+        {"at": [0.25, 0.25, 0.8], "size": [0.5, 0.5, 0.5], "color": "#8ecdf0"},
+        {"at": [0.35, 0.78, 0.45], "size": [0.3, 0.05, 0.12], "color": "#3b82c4"}
+      ],
+      "slots": [{"pose": "drink", "at": [0.5, 1.3]}]
+    },
+    {
+      "id": "pothos", "name": "绿萝盆栽", "comfort": 6, "size": [1, 1], "layer": "object", "stack": 3,
+      "boxes": [
+        {"at": [0.3, 0.3, 0], "size": [0.4, 0.4, 0.35], "color": "#c46d4a"},
+        {"at": [0.2, 0.2, 0.35], "size": [0.6, 0.6, 0.35], "color": "#4fa45b"},
+        {"at": [0.3, 0.3, 0.7], "size": [0.4, 0.4, 0.25], "color": "#62b86d"}
+      ]
+    },
+    {
+      "id": "round_rug", "name": "米色地毯", "comfort": 6, "size": [3, 2], "layer": "rug",
+      "boxes": [{"at": [0, 0, 0], "size": [3, 2, 0.03], "color": "#e9dcc3"}, {"at": [0.3, 0.3, 0.03], "size": [2.4, 1.4, 0.01], "color": "#d8c4a0"}]
+    }
+  ]
+}
