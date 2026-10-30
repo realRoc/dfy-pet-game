@@ -2,7 +2,7 @@
 
 本目录的 `*.webm`（92 段）取自 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet) 的 `dsh-pet/assets/webm`（提交 [`dfc0396`](https://github.com/PC2005-cloud/dsh-pet/tree/dfc03961bdb4d26898838cb72c9c2ac09699b1e2)），文件原样未改。
 
-**这些动画不适用 MIT 许可。** 本仓库的 [`LICENSE`](../../LICENSE) 和 [`LICENSE-dsh-pet`](../../LICENSE-dsh-pet) 只覆盖代码；
+**这些动画不适用 MIT 许可。** 本仓库的 [`LICENSE`](../../../LICENSE) 和 [`LICENSE-dsh-pet`](../../../LICENSE-dsh-pet) 只覆盖代码；
 `clips.json` 里的分类沿用 dsh-pet `config.jsonc` 的随机动作分类，属于上游代码 / 配置部分，适用 `LICENSE-dsh-pet`（MIT）。
 
 按 dsh-pet README「许可」一节（提交 `dfc0396`），这些动画同时受两层约束：

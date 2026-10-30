@@ -62,7 +62,7 @@ jobs:
           node -e '
             const files = new Set(JSON.parse(require("fs").readFileSync("pack.json"))[0].files.map((f) => f.path))
             const need = ["package.json", "cordis.patch.yml", "dsh/index.js", "dsh/tool.js", "dsh/locale/zh.json",
-              "main.py", "control.py", "requirements.txt", "sprites/icon.png", "content/tower/index.html"]
+              "main.py", "control.py", "requirements.txt", "characters/dafeiyu/character.json", "characters/dafeiyu/sprites/icon.png", "content/tower/index.html"]
             const missing = need.filter((f) => !files.has(f))
             if (missing.length) { console.error("npm 包缺文件:", missing); process.exit(1) }
             if ([...files].some((f) => f.startsWith("tower/") || f.startsWith("tests/"))) { console.error("npm 包带了不该带的目录"); process.exit(1) }'

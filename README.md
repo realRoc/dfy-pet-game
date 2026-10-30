@@ -66,7 +66,7 @@
 
 ### 动作动画
 
-dsh-pet 的动画是同一个大肥鱼形象的完整视频（640×360、24 帧、VP9 透明 webm），放在 `content/clips/`。
+dsh-pet 的动画是同一个大肥鱼形象的完整视频（640×360、24 帧、VP9 透明 webm），放在角色包的 `characters/dafeiyu/clips/`。
 播的时候人物按待机动画的身高缩放到桌宠大小、脚底对齐，开头结尾和正面图淡入淡出；
 吹气球、放风筝这类比人宽的，桌宠窗口会临时撑大，播完缩回来。
 用 [PyAV](https://github.com/PyAV-Org/PyAV) 边播边解码（自带 libvpx，不用另装 ffmpeg），没装 PyAV 时这些动作不出现，其他功能照常。
@@ -87,7 +87,7 @@ dsh-pet 的动画是同一个大肥鱼形象的完整视频（640×360、24 帧�
 
 ![跟练](docs/workout.png)
 
-跟练动画是 Seedance 2.5 照着原版 `sprites/正面.png` 生成的绿幕视频，抠成透明 webm（`content/workout/clips/`）。
+跟练动画是 Seedance 2.5 照着原版正面立绘（`characters/dafeiyu/sprites/正面.png`）生成的绿幕视频，抠成透明 webm（`characters/dafeiyu/workout/clips/`）。
 每段的首帧和尾帧都是同一张正面图，所以动作、偷懒、喝水之间怎么接都不会跳；躺着练的臀桥、蹲着的靠墙静蹲拆成
 躺下 / 循环 / 起身三段。提示词和流程见 [`content/workout/README.md`](content/workout/README.md)，同样适用 CC BY-NC-SA 4.0。
 没装 PyAV 时退回旧的一套：ChatGPT 画的姿势帧按关键帧时间轴播。
@@ -117,7 +117,14 @@ dsh-pet 的动画是同一个大肥鱼形象的完整视频（640×360、24 帧�
 
 动画和跟练动画是同一套做法（Seedance 2.5 首尾帧 + 绿幕抠像），离场那段停在侧面站姿、返场两段从侧面站姿开始，
 好和走路的侧面图接上；提示词在 [`tools/make_water_clips.py`](tools/make_water_clips.py)，素材说明见
-[`content/water/README.md`](content/water/README.md)。没装 PyAV 或素材缺失时换成表情动作，流程照走。
+[`characters/dafeiyu/water/README.md`](characters/dafeiyu/water/README.md)。没装 PyAV 或素材缺失时换成表情动作，流程照走。
+
+### 角色包
+
+引擎和角色是分开的：大肥鱼的立绘、动画、台词、人设和授权都在 [`characters/dafeiyu/`](characters/dafeiyu/) 里，
+由 `character.json` 描述。换角色只换包、不改代码（`DFY_CHARACTER=<包名> python main.py`）；
+包里缺哪类动画，对应功能按原来的方式降级（比如没有跟练动画就用姿势帧，没有喝水动画就用表情）。
+格式和动画约定见 [`characters/README.md`](characters/README.md)。大肥鱼包不可商用，见 [`characters/dafeiyu/LICENSE.md`](characters/dafeiyu/LICENSE.md)。
 
 ## 运行
 
@@ -191,18 +198,18 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 | `pet.py` | 桌宠本体（移植自 dafeiyu-pet 的 `桌宠.py`） |
 | `expressions.py` | 表情动作 |
 | `clips.py` | 动作动画播放器（PyAV 解码透明 webm） |
-| `workout.py` | 健身跟练：原子动作、训练计划、计时和大肥鱼的人设动作 |
-| `content/workout/` | 跟练动画（`clips/`）、姿势帧（`frames/`，没装 PyAV 时用）和内置训练计划（`plans/`） |
-| `tools/make_workout_clips.py` | 用 Seedance 生成跟练动画（提示词都在这里），抠绿幕后写进 `content/workout/clips/` |
-| `tools/make_workout_frames.py` | 把生成的姿势原图裁边、统一大小、算脚底锚点，写进 `content/workout/frames/` |
+| `workout.py` | 健身跟练：原子动作、训练计划、计时和角色的人设动作 |
+| `character.py` | 角色包加载：按 `character.json` 找立绘、动画、台词、人设；`DFY_CHARACTER` 换包 |
+| `characters/` | 角色包，一个角色一个目录，格式见 [`characters/README.md`](characters/README.md) |
+| `characters/dafeiyu/` | 默认角色包「大肥鱼」：立绘（`sprites/`，来自 dafeiyu-pet）、动作动画（`clips/`）、跟练动画和姿势帧（`workout/`）、喝水动画（`water/`）、台词和人设（`character.json`）。**非商用** |
+| `content/workout/` | 内置训练计划（`plans/`）和跟练素材说明 |
+| `tools/make_workout_clips.py` | 用 Seedance 生成跟练动画（提示词都在这里），抠绿幕后写进当前角色包的 `workout/clips/` |
+| `tools/make_workout_frames.py` | 把生成的姿势原图裁边、统一大小、算脚底锚点，写进当前角色包的 `workout/frames/` |
 | `workouts/` | 自己写的训练计划（不进 git） |
-| `water.py` | 喝水提醒：计时和升级的状态机、台词、碎屏特效 |
-| `content/water/clips/` | 喝水提醒的动画（透明 webm） |
-| `tools/make_water_clips.py` | 用 Seedance 生成喝水提醒的动画（提示词都在这里），抠绿幕后写进 `content/water/clips/` |
-| `content/clips/` | dsh-pet 的动作动画 webm 和 `clips.json`（分类、人物外框） |
-| `tools/import_clips.py` | 从 dsh-pet 的 `assets/webm` 导入动作动画，算人物外框、写 `clips.json` |
+| `water.py` | 喝水提醒：计时和升级的状态机、碎屏特效（台词在角色包里） |
+| `tools/make_water_clips.py` | 用 Seedance 生成喝水提醒的动画（提示词都在这里），抠绿幕后写进当前角色包的 `water/clips/` |
+| `tools/import_clips.py` | 从 dsh-pet 的 `assets/webm` 导入动作动画，算人物外框、写进当前角色包的 `clips/` |
 | `common.py` | 路径、平台差异（字体、窗口标志）、配置、精灵加载 |
-| `sprites/` | 精灵图（来自 dafeiyu-pet） |
 | `启动大肥鱼.command` | macOS 双击启动脚本 |
 | `tower/` | 爬塔（Vite + TypeScript），和桌宠不共用代码，见 [tower/README.md](tower/README.md) |
 | `content/tower/` | 爬塔打包好的单文件网页（`npm run release` 生成，提交进仓库），桌宠的 🗼 入口打开它 |
@@ -214,21 +221,24 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 ## 致谢与引用
 
 - **[1190fasheqi/dafeiyu-pet](https://github.com/1190fasheqi/dafeiyu-pet)**（MIT）：大肥鱼透明桌宠。
-  - 精灵图（`sprites/`，取自提交 `5b0e018`）直接沿用。
+  - 精灵图（`characters/dafeiyu/sprites/`，取自提交 `5b0e018`）直接沿用。
   - `pet.py` 移植自它的 `桌宠.py`，包括台词、散步 / 跟随逻辑、喂食、AI 对话、天气、系统监控、菜单。其中 AI 对话、天气、系统监控由 [Cpanoe](https://github.com/Cpanoe) 贡献给原项目。
   - 在此基础上的改动：macOS 适配（鼠标穿透改用 Qt 自带标志、开机自启改用 LaunchAgent、字体按平台选、窗口不用 Tool 标志）；天气查询改到后台线程；修复了双击后会多触发一次单击的问题；新增表情系统。
   - 它的原始许可证保留在 [`LICENSE-dafeiyu-pet`](LICENSE-dafeiyu-pet)。
 - **[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)**：DeepSeek Harness 桌宠。它的代码和素材是分开授权的：
-  - 代码 MIT，许可证保留在 [`LICENSE-dsh-pet`](LICENSE-dsh-pet)。本项目只沿用了它 `config.jsonc` 里的随机动作分类（`content/clips/clips.json`）。
-  - `content/clips/` 的 92 段动作动画取自它的 `dsh-pet/assets/webm`（提交 `dfc0396`），文件原样未改。**这些动画不适用 MIT**：
-    素材允许开源使用、**禁止商用**，角色形象另受 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 约束；署名和条款详见 [`content/clips/LICENSE.md`](content/clips/LICENSE.md)。
+  - 代码 MIT，许可证保留在 [`LICENSE-dsh-pet`](LICENSE-dsh-pet)。本项目只沿用了它 `config.jsonc` 里的随机动作分类（`characters/dafeiyu/clips/clips.json`）。
+  - `characters/dafeiyu/clips/` 的 92 段动作动画取自它的 `dsh-pet/assets/webm`（提交 `dfc0396`），文件原样未改。**这些动画不适用 MIT**：
+    素材允许开源使用、**禁止商用**，角色形象另受 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans) 约束；署名和条款详见 [`characters/dafeiyu/clips/LICENSE.md`](characters/dafeiyu/clips/LICENSE.md)。
 - 「鲸鱼娘·大肥鱼」是 DeepSeek 社区的二创形象（非 DeepSeek 官方形象），角色形象的权利归原作者 / 相关权利人；
-  形象作者声明其适用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)，作者署名见 [`content/clips/LICENSE.md`](content/clips/LICENSE.md)。
+  形象作者声明其适用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)，作者署名见 [`characters/dafeiyu/clips/LICENSE.md`](characters/dafeiyu/clips/LICENSE.md)。
   本项目为非商业同人作品，如需商用请先联系素材作者。
 - 界面使用 [PySide6](https://doc.qt.io/qtforpython-6/)（Qt for Python，LGPL）。
 
 ## 协议
 
-本项目代码采用 [MIT](LICENSE) 协议；`sprites/` 目录和移植自 dafeiyu-pet 的代码同时沿用上游的 MIT 许可，并受上面的角色形象说明约束。
-`content/clips/*.webm` 的动作动画**不在 MIT 范围内**：沿用 dsh-pet 的素材条款（开源可用、禁止商用），角色形象适用 CC BY-NC-SA 4.0，见 [`content/clips/LICENSE.md`](content/clips/LICENSE.md)。
-`content/workout/clips/` 的跟练动画、`content/workout/frames/` 的跟练姿势帧和 `content/water/clips/` 的喝水提醒动画同样**不在 MIT 范围内**，是角色形象的衍生图，适用 CC BY-NC-SA 4.0，见 [`content/workout/README.md`](content/workout/README.md)。
+本项目代码（引擎）采用 [MIT](LICENSE) 协议；移植自 dafeiyu-pet 的代码同时沿用上游的 MIT 许可。
+
+角色相关的东西全在角色包里，**授权跟着包走**，每个包的 `character.json` 里 `license` 字段写明（`commercial` 是不是可商用）。
+默认包 `characters/dafeiyu/` 整个**不在 MIT 范围内、不可商用**，见 [`characters/dafeiyu/LICENSE.md`](characters/dafeiyu/LICENSE.md)：
+立绘、跟练动画、姿势帧、喝水动画、台词人设是「大肥鱼」形象及其衍生，适用 CC BY-NC-SA 4.0；
+`clips/*.webm` 的动作动画另外沿用 dsh-pet 的素材条款（开源可用、禁止商用），见 [`characters/dafeiyu/clips/LICENSE.md`](characters/dafeiyu/clips/LICENSE.md)。

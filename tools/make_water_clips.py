@@ -1,7 +1,7 @@
 """用 Seedance 生成喝水提醒的动画，再抠成透明 webm：
 
     python tools/make_water_clips.py gen <工作目录> [名字 ...]   # 提交生成，下载绿幕 mp4 到工作目录（已有的跳过）
-    python tools/make_water_clips.py import <工作目录>           # 抠绿幕、算外框，产物放 content/water/clips/
+    python tools/make_water_clips.py import <工作目录>           # 抠绿幕、算外框，产物放角色包的 water 动画目录
 
 生成、抠像和跟练动画是同一套（tools/make_workout_clips.py），这里只有提示词。
 每段都从正面站姿开始、回到正面站姿；只有气跑那段（water_leave）停在侧面站姿上，
@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import make_workout_clips as base   # noqa: E402
 
-OUT_DIR = os.path.join(base.ROOT, "content", "water", "clips")
+OUT_DIR = base.CHAR.anim_dir("water") or base.CHAR.path("water/clips")
 
 # 只写「水壶」会被画成浇花的花洒壶：写清楚是随身喝水用的直筒运动水壶
 BOTTLE = ("蓝色的随身运动水壶（和她的头发同色；直筒圆柱形，顶上是带小提环的盖子，没有壶嘴，壶身上有一个白色小水滴图案；"

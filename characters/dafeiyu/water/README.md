@@ -1,8 +1,8 @@
 # 喝水提醒素材
 
 `clips/` 里每段是一个透明 webm（VP9 + alpha），`clips.json` 记着每段在原画面里的位置和帧数，由
-[`tools/make_water_clips.py`](../../tools/make_water_clips.py) 生成。生成和抠像和跟练动画是同一套
-（[`content/workout/README.md`](../workout/README.md#跟练动画)）：TeamoRouter 的 Seedance 2.5 图生视频，首尾帧模式，
+[`tools/make_water_clips.py`](../../../tools/make_water_clips.py) 生成。生成和抠像和跟练动画是同一套
+（[`content/workout/README.md`](../../../content/workout/README.md#跟练动画)）：TeamoRouter 的 Seedance 2.5 图生视频，首尾帧模式，
 绿幕色差抠像。
 
 | 片段 | 首帧 → 尾帧 | 内容 |
@@ -15,7 +15,7 @@
 | `water_return_makeup` | **侧面** → 正面 | 回来时你喝了：挠头、比心 |
 | `water_cheers` | 正面 → 正面 | 喝了：干杯，头顶喷出小水柱挂彩虹 |
 
-「侧面」是 `sprites/侧面.png` 按和正面图一样的大小、脚底位置贴绿幕（脸朝左）；往右边跑 / 从左边回来时整段镜像。
+「侧面」是包里的 `sprites/侧面.png` 按和正面图一样的大小、脚底位置贴绿幕（脸朝左）；往右边跑 / 从左边回来时整段镜像。
 +5 分钟的「示范喝水」直接用跟练动画的 `drink`。
 
 扔过来的大水、碎屏、水花是 `water.py` 里用代码画的（`ShatterOverlay`），不是素材。
@@ -29,4 +29,4 @@ python tools/make_water_clips.py import <工作目录>
 ## 授权
 
 这些动画是「大肥鱼」形象的衍生图，适用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/deed.zh-hans)
-（署名、非商业、相同方式共享），**不在本仓库代码的 MIT 范围内**。形象署名见 [`content/clips/LICENSE.md`](../clips/LICENSE.md)。
+（署名、非商业、相同方式共享），**不在本仓库代码的 MIT 范围内**。形象署名见 [`clips/LICENSE.md`](../clips/LICENSE.md)。

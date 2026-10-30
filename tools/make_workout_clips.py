@@ -1,16 +1,16 @@
 """用 Seedance 生成跟练动画，再抠成透明 webm：
 
     python tools/make_workout_clips.py gen <工作目录> [名字 ...]   # 提交生成，下载绿幕 mp4 到工作目录（已有的跳过）
-    python tools/make_workout_clips.py import <工作目录>           # 抠绿幕、算外框，产物放 content/workout/clips/
+    python tools/make_workout_clips.py import <工作目录>           # 抠绿幕、算外框，产物放角色包的 workout 动画目录
 
 生成走 TeamoRouter 的视频接口（POST /v1/videos，Seedance 2.5 图生视频，首尾帧），
 Key 从环境变量 TEAMOROUTER_API_KEY 读，地址可用 TEAMOROUTER_BASE 改（默认 https://api.teamorouter.vip/v1）。
 
-每段的首帧、尾帧默认都是同一张「中立」图：sprites/正面.png 原样放大贴在纯绿幕上。
+每段的首帧、尾帧默认都是同一张「中立」图：角色包的正面立绘（sprites.front）原样放大贴在纯绿幕上。
 所以每段都从原版站姿开始、回到原版站姿，任意两段首尾相接都不会跳——中立 → 动作 / 表情 → 中立。
 躺着、蹲着练的动作拆成 进入 / 循环 / 起身 三段：进入那段不给尾帧，
 取它的最后一帧当循环段的首尾帧和起身段的首帧（SPECS 里 first / last 写别的段名）。
-首帧 / 尾帧也可以写 "side"：sprites/侧面.png 按同样的大小和位置贴绿幕（朝画面左边），给要转身走开、走回来的片段用。
+首帧 / 尾帧也可以写 "side"：侧面立绘（sprites.side）按同样的大小和位置贴绿幕（朝画面左边），给要转身走开、走回来的片段用。
 
 别的素材（比如喝水提醒，tools/make_water_clips.py）复用这里的生成和抠像，只换 SPECS 和产物目录。
 
@@ -28,9 +28,11 @@ import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(ROOT, "content", "workout", "clips")
-SPRITE = os.path.join(ROOT, "sprites", "正面.png")
-SIDE_SPRITE = os.path.join(ROOT, "sprites", "侧面.png")
+sys.path.insert(0, ROOT)
+from character import CHAR   # noqa: E402  产物写进当前角色包（DFY_CHARACTER，默认 dafeiyu）
+OUT_DIR = CHAR.anim_dir("workout") or CHAR.path("workout/clips")
+SPRITE = CHAR.sprite("front")
+SIDE_SPRITE = CHAR.sprite("side")
 BASE = os.environ.get("TEAMOROUTER_BASE", "https://api.teamorouter.vip/v1")
 MODEL = "seedance-2-5-image-to-video-basic"
 CANVAS = 960          # 中立图边长（1:1）
@@ -370,8 +372,8 @@ def import_(work, specs=SPECS, out_dir=OUT_DIR, script="tools/make_workout_clips
     with ThreadPoolExecutor(max_workers=max(1, (os.cpu_count() or 4) // 2)) as pool:
         results = dict(zip(names, pool.map(lambda n: key_one(work, n, out_dir), names)))
     manifest = {
-        "source": f"Seedance 2.5（{MODEL}），首尾帧 = sprites/正面.png 贴绿幕；提示词见 {script}",
-        # 中立图里 sprites/正面.png 整张图（含留白）的高度、中线、底边：运行时缩放到和桌宠的正面图一样大、
+        "source": f"Seedance 2.5（{MODEL}），首尾帧 = {os.path.relpath(SPRITE, ROOT)} 贴绿幕；提示词见 {script}",
+        # 中立图里正面立绘整张图（含留白）的高度、中线、底边：运行时缩放到和桌宠的正面图一样大、
         # 摆在同一个位置，片段的首尾帧就和平时的正面图严丝合缝
         "ref": {"h": SPRITE_H, "cx": CANVAS / 2, "foot": CANVAS - FOOT_MARGIN},
         "clips": {n: results[n] for n in names},

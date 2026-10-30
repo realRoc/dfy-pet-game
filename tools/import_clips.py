@@ -8,7 +8,7 @@ dsh-pet（https://github.com/PC2005-cloud/dsh-pet）的动画是 640×360、24 �
 webm 原样复制：试过裁边后重压，VP9 重压反而比原文件大；转成逐帧图片（WebP / PNG）更是大 4~8 倍。
 640×360 的 VP9 解一帧不到 1ms，运行时整帧解码再裁不费事。
 
-产物放 content/clips/：每段一个 <名字>.webm，外加 clips.json（分类、外框、帧数）。
+产物放角色包的 actions 动画目录（大肥鱼是 characters/dafeiyu/clips/）：每段一个 <名字>.webm，外加 clips.json（分类、外框、帧数）。
 需要本机装有带 libvpx 的 ffmpeg（brew install ffmpeg）；运行时用 PyAV 解码，不需要 ffmpeg。
 """
 import json
@@ -20,7 +20,9 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(ROOT, "content", "clips")
+sys.path.insert(0, ROOT)
+from character import CHAR   # noqa: E402  产物写进当前角色包（DFY_CHARACTER，默认 dafeiyu）
+OUT_DIR = CHAR.anim_dir("actions") or CHAR.path("clips")
 REF_CLIP = "待机呼吸休闲"
 PAD = 4
 ALPHA_MIN = 24   # VP9 的 alpha 有损，背景不是严格的 0

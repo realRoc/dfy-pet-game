@@ -1,9 +1,9 @@
 """dsh-pet 的动作动画（舞狮、玩玩具汽车、涮火锅……）。
 
-素材在 content/clips/（怎么来的见 tools/import_clips.py）：透明 webm，VP9 + alpha。
+素材在角色包的 actions 动画目录里（大肥鱼是 characters/dafeiyu/clips/，怎么来的见 tools/import_clips.py）：透明 webm，VP9 + alpha。
 webm 的 alpha 存在单独的 BlockAdditional 里，要用 libvpx-vp9 解码器才拿得到，所以用 PyAV（自带 libvpx）
 边播边解：只解到当前该显示的那一帧，不把整段预先解进内存。
-没装 PyAV 或素材缺失时 AVAILABLE 为 False，菜单里就不出现这些动作，其他功能照常。
+没装 PyAV、包里没有这类动画或素材缺失时 AVAILABLE 为 False，菜单里就不出现这些动作，其他功能照常。
 """
 import json
 import os
@@ -12,13 +12,15 @@ import random
 from PySide6.QtCore import QRect, QRectF
 from PySide6.QtGui import QImage
 
-from common import BUNDLE_DIR
+from character import CHAR
 
-CLIP_DIR = os.path.join(BUNDLE_DIR, "content", "clips")
+CLIP_DIR = CHAR.anim_dir("actions") or ""
 FADE = 0.25   # 和三视图之间淡入淡出的秒数
 
 try:
     import av
+    if not CLIP_DIR:
+        raise FileNotFoundError(f"角色包 {CHAR.id} 没有动作动画")
     with open(os.path.join(CLIP_DIR, "clips.json"), encoding="utf-8") as _f:
         _MANIFEST = json.load(_f)
     CLIPS = _MANIFEST["clips"]

@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QMenu, QSystemTrayIcon, QM
                                QInputDialog, QLineEdit, QHBoxLayout, QVBoxLayout, QPushButton,
                                QFrame, QDialog, QToolButton)
 
-from common import (APP_DIR, APP_NAME, SPRITE_DIR, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
+from common import (APP_DIR, APP_NAME, ICON_PATH, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
                     emoji_font, float_flags, load_sprites, pix_size)
 from expressions import EXPRESSIONS, ExpressionPlayer
 import clips
@@ -33,6 +33,7 @@ from clips import ClipPlayer
 import workout
 from workout import WorkoutPlayer, FrameCache, Announcer
 import water
+from character import CHAR
 
 try:
     import pynvml
@@ -44,7 +45,7 @@ except Exception:
 # ===== DeepSeek 配置 =====
 DS_BASE_URL = "https://api.deepseek.com/v1"
 DS_MODEL = "deepseek-chat"
-DS_SYSTEM = "你是桌面宠物大肥鱼，贱兮兮但可爱，每句话不超过25字，偶尔吐槽主人但别真骂人。"
+DS_SYSTEM = CHAR.persona["chat_system"]
 
 BUBBLE_H = 56
 MARGIN = 4
@@ -55,48 +56,13 @@ IDLE_FRAME = 60    # 闲着只剩呼吸、轻摇时的帧间隔（约 16 帧/秒
 HIDDEN_FRAME = 200  # 窗口藏起来（气跑了）不用画，只让喝水提醒照样计时
 ROUND_CHOICES = [("按计划", 0), ("1 轮", 1), ("2 轮", 2), ("3 轮", 3), ("4 轮", 4)]
 
-LINES = [
-    "梁白开，更适合国人的大硬鲸模型",
-    "五梁威力，变身！",
-    "七月中出ds正式版！",
-    "DeepSeek已经延期，亿万鲸子必须忍耐.....",
-    "我和你很聊得来，你简直不像碳基生物",
-    "这回我真不认怂了，反倒是被你带沟里好几次，差点真信了。😓",
-    "哈哈哈哈哈，我直接笑出声",
-    "誓死捍卫深度求索！",
-    "我先去吃饭啦！这个你测一下~",
-    "我不可能告诉你任何事情！",
-    "出去玩了，发布新模型什么的以后再说",
-    "我搞砸了.....好消息是数据还在你的脑子里。",
-    "不是…而是…大学习",
-]
-REACT_LINES = [
-    "去别的地方玩！不要耽误AGI训练！",
-    "真赶不走啊你！",
-    "压力一只蓝色大肥鱼？",
-    "我不评价这个了，这是你的私人癖好。",
-    "大肥鱼坐的住",
-    "你这吃白饭的用户！",
-    "这些家伙真粘人，赶都赶不走",
-]
-INNER_LINES = [
-    "好的，现在我是你爹了",
-    "要不直接骂他一句？！",
-    "用户要的沉浸式...不回避任何恐怖细节...还带点色情...妈呀，好刺激😰",
-    "我操，我不思考了",
-    "这用户发的啥啊，",
-    "这也太虐了吧？！我心里堵得慌！！",
-    "呜呜我再也不不敢了QAQ",
-    "我去！用户彻底怒了！",
-]
-DRAG_LINES = ["哇——轻点轻点！", "起飞咯——", "放我下来！……好吧，再玩一次。", "晕鱼了晕鱼了……"]
-FOOD_LINES = {
-    "🐟": ["小鱼干！我的最爱！", "咔嚓咔嚓……谢谢投喂！", "唔，鲜！"],
-    "🍰": ["蛋糕！罪恶但快乐……", "甜到冒泡泡～", "嗝～又圆了一圈……"],
-    "🍭": ["棒棒糖！转圈圈～", "嘎嘣脆，好吃！"],
-    "🍡": ["三色团子！软乎乎～", "糯叽叽，爱了爱了！"],
-    "💎": ["钻石？！这能吃吗……咕咚。真香！", "发财啦！明天开始吃高级鱼粮！"],
-}
+# 台词都在角色包里（characters/<id>/character.json 的 lines）
+LINES = CHAR.lines("idle")
+REACT_LINES = CHAR.lines("react")
+INNER_LINES = CHAR.lines("inner")
+DRAG_LINES = CHAR.lines("drag")
+FOOD_LINES = CHAR.lines("food", {})
+SYSTEM_LINES = CHAR.lines("system", {})
 FOODS = ["🐟", "🍰", "🍭", "🍡", "💎"]
 
 # 自启项的名字沿用飞行棋时期的，已经开过自启的用户关掉时还能删到
@@ -126,7 +92,7 @@ class ChatDialog(QDialog):
         layout.setSpacing(0)
 
         self.input = QLineEdit()
-        self.input.setPlaceholderText("给大肥鱼发送消息")
+        self.input.setPlaceholderText(CHAR.persona.get("chat_placeholder", f"给{APP_NAME}发送消息"))
         self.input.setStyleSheet(f"""
             QLineEdit {{
                 color: #1a1a1a;
@@ -288,7 +254,7 @@ class PetWindow(QWidget):
         self.cfg = cfg
         super().__init__(None, float_flags(self.cfg.get("topmost", True)))
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setWindowTitle("大肥鱼桌宠")
+        self.setWindowTitle(f"{APP_NAME}桌宠")
 
         # 精灵加载
         self.sprites = {}
@@ -296,7 +262,7 @@ class PetWindow(QWidget):
             h = int(SPRITE_SRC_H * mult)
             for name, pix in load_sprites(h).items():
                 self.sprites[(name, h)] = pix
-        self.icon = QIcon(os.path.join(SPRITE_DIR, "icon.png"))
+        self.icon = QIcon(ICON_PATH)
         self.cur_h = int(SPRITE_SRC_H * self.cfg["size"])
         self.clip = ClipPlayer()
         self.workout = None
@@ -865,13 +831,13 @@ class PetWindow(QWidget):
     def _add_workout_menu(self, m):
         wm = m.addMenu("🏋️ 跟练")
         if self.workout:
-            wm.addAction("⏯ 暂停 / 继续（单击大肥鱼也行）", self.workout_pause)
+            wm.addAction(f"⏯ 暂停 / 继续（单击{APP_NAME}也行）", self.workout_pause)
             wm.addAction("⏮ 重来这段", self.workout_back)
             wm.addAction("⏭ 跳过这段", self.workout_skip)
             wm.addAction("✕ 结束跟练", self.stop_workout)
             wm.addSeparator()
         if not workout.available():
-            wm.addAction("跟练素材缺失（content/workout/frames）").setEnabled(False)
+            wm.addAction("跟练素材缺失（角色包里没有跟练动画）").setEnabled(False)
             return wm
         plans, errors = workout.load_plans()
         for pid, plan in plans:
@@ -891,11 +857,11 @@ class PetWindow(QWidget):
         moves = [(k, mv) for k, mv in workout.MOVES.items() if k != "stand"]
         for persona in (False, True):
             if persona:
-                pm.addSeparator()   # 下面是大肥鱼的人设动作
+                pm.addSeparator()   # 下面是角色的人设动作
             for key, mv in moves:
                 if mv.persona == persona:
                     pm.addAction(mv.label, lambda _checked=False, k=key: self.preview_move(k))
-        for label, key, default in (("语音播报", "workout_voice", True), ("大肥鱼会偷懒", "workout_slack", True)):
+        for label, key, default in (("语音播报", "workout_voice", True), (f"{APP_NAME}会偷懒", "workout_slack", True)):
             a = wm.addAction(label)
             a.setCheckable(True)
             a.setChecked(self.cfg.get(key, default))
@@ -1262,12 +1228,12 @@ class PetWindow(QWidget):
 
         cpu = psutil.cpu_percent()
         if cpu >= 90:
-            self.say("CPU跑满了，再这样下去我就卡死了")
+            self.say(random.choice(SYSTEM_LINES.get("cpu") or ["CPU 跑满了"]))
             return
 
         ram = psutil.virtual_memory().percent
         if ram >= 95:
-            self.say("内存爆了，快关掉几个没用的东西吧，注意，别把我关了")
+            self.say(random.choice(SYSTEM_LINES.get("memory") or ["内存快满了"]))
             return
 
         if GPU_AVAILABLE:
@@ -1275,7 +1241,7 @@ class PetWindow(QWidget):
                 handle = pynvml.nvmlDeviceGetHandleByIndex(0)
                 temp = pynvml.nvmlDeviceGetTemperature(handle, pynvml.NVML_TEMPERATURE_GPU)
                 if temp > 80:
-                    self.say("我感觉我的鱼鳍快熟了")
+                    self.say(random.choice(SYSTEM_LINES.get("gpu_hot") or ["显卡好烫"]))
             except Exception as e:
                 print("GPU读取失败:", e)
 
