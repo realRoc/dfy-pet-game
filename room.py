@@ -1,11 +1,11 @@
-"""后宅：一个等距视角的小房间，摆家具、凑套装，舒适度会让桌宠心情变好。
+"""后宅：一个等距视角的小房间，摆家具、凑套装。
 
 几块：
 - 家具目录：content/room/catalog.json（家具、套装、姿势库、墙纸、地板）。家具都是网页里按 boxes 用代码画的原创图，
   可以商用；家具不带角色动画，只声明「姿势槽位」（slots），角色走过去按姿势库里的标准姿势待着。
 - 布局：摆了哪些家具、在哪、朝哪，选了哪种墙纸地板，存在 DATA_DIR/room.json。规则（不出界、不重叠）在这里校验，
   网页那边只是预判，以这里为准。
-- 舒适度：每件家具的舒适度相加（同一件摆多份只算前 stack 份），套装里每件都摆上了再加套装加成。
+- 套装：套装里每件都摆上了就算集齐，网页显示进度、集齐时提示。
 - RoomAPI：网页用的全部接口（目录、状态、改布局），只收发 JSON 能表示的东西，不碰传输。
   现在由 RoomServer 包成 127.0.0.1 上的 HTTP 服务，网页用系统浏览器打开；以后迁到 Electron 时换成 IPC，接口不变。
 这个模块不依赖 Qt。
@@ -56,8 +56,8 @@ def validate_catalog(cat):
             errors.append(f"{iid}: layer 只能是 {LAYERS}")
         if it.get("set") and it["set"] not in sets:
             errors.append(f"{iid}: 没有套装 {it['set']}")
-        if not it.get("name") or not isinstance(it.get("comfort"), int) or it["comfort"] < 0:
-            errors.append(f"{iid}: 要有 name 和非负整数 comfort")
+        if not it.get("name"):
+            errors.append(f"{iid}: 缺 name")
         if not it.get("boxes"):
             errors.append(f"{iid}: 没有 boxes，画不出来")
         for b in it.get("boxes", []):
@@ -136,42 +136,26 @@ def validate_layout(cat, data):
     return {"version": LAYOUT_VERSION, "wallpaper": wallpaper, "floor": floor, "placed": out}
 
 
-def comfort(cat, layout):
-    """舒适度：家具舒适度之和 + 集齐的套装加成。返回网页和桌宠都用的一份摘要。"""
-    counts = {}
-    for p in layout["placed"]:
-        counts[p["item"]] = counts.get(p["item"], 0) + 1
-    base = sum(cat["by_id"][iid]["comfort"] * min(n, cat["by_id"][iid].get("stack", 1)) for iid, n in counts.items())
-    sets, bonus = [], 0
+def sets_progress(cat, layout):
+    """每个套装摆了几件、还差哪几件、集齐没有。"""
+    have = {p["item"] for p in layout["placed"]}
+    out = []
     for s in cat["sets"]:
         members = [it["id"] for it in cat["items"] if it.get("set") == s["id"]]
-        have = [m for m in members if m in counts]
-        done = len(have) == len(members)
-        if done:
-            bonus += s["bonus"]
-        sets.append({"id": s["id"], "name": s["name"], "have": len(have), "total": len(members),
-                     "complete": done, "bonus": s["bonus"], "missing": [m for m in members if m not in counts]})
-    total = base + bonus
-    levels = cat["comfort_levels"]
-    level = max(i for i, lv in enumerate(levels) if total >= lv["min"])
-    return {"total": total, "base": base, "set_bonus": bonus, "level": level, "level_name": levels[level]["name"],
-            "max_level": len(levels) - 1, "sets": sets}
-
-
-def mood_bonus(summary):
-    """舒适度对桌宠心情的影响，0~1：等级越高，闲着时越常做开心类的表情。"""
-    return summary["level"] / max(1, summary["max_level"])
+        missing = [m for m in members if m not in have]
+        out.append({"id": s["id"], "name": s["name"], "have": len(members) - len(missing), "total": len(members),
+                    "complete": not missing, "missing": missing})
+    return out
 
 
 class RoomStore:
-    """布局存档，线程安全（HTTP 服务在后台线程里改，桌宠在主线程里读舒适度）。"""
+    """布局存档，线程安全（HTTP 服务在后台线程里读写）。"""
 
     def __init__(self, path, cat=None):
         self.path = path
         self.cat = cat or load_catalog()
         self._lock = threading.Lock()
         self._layout = self._read()
-        self._comfort = comfort(self.cat, self._layout)
 
     def _read(self):
         try:
@@ -191,22 +175,17 @@ class RoomStore:
         with self._lock:
             return json.loads(json.dumps(self._layout))
 
-    def comfort(self):
-        with self._lock:
-            return self._comfort
-
     def save(self, data):
-        """校验、写盘，返回 (规整后的布局, 舒适度)；不合规抛 LayoutError，原布局不动。"""
+        """校验、写盘，返回规整后的布局；不合规抛 LayoutError，原布局不动。"""
         layout = validate_layout(self.cat, data)
-        summary = comfort(self.cat, layout)
         with self._lock:
             os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
             tmp = self.path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(layout, f, ensure_ascii=False, indent=1)
             os.replace(tmp, self.path)
-            self._layout, self._comfort = layout, summary
-        return layout, summary
+            self._layout = layout
+        return layout
 
 
 class RoomAPI:
@@ -218,21 +197,21 @@ class RoomAPI:
 
     def catalog(self):
         cat = self.store.cat
-        return {k: cat[k] for k in ("format", "license", "room", "poses", "comfort_levels", "wallpapers", "floors",
-                                    "sets", "items")}
+        return {k: cat[k] for k in ("format", "license", "room", "poses", "wallpapers", "floors", "sets", "items")}
 
     def state(self):
         c = self.char
+        layout = self.store.layout()
         return {
-            "layout": self.store.layout(),
-            "comfort": self.store.comfort(),
+            "layout": layout,
+            "sets": sets_progress(self.store.cat, layout),
             "character": {"id": c.id, "name": c.name, "side_faces": c.side_faces,
                           "sprites": {v: f"/character/{v}.png" for v in ("front", "side", "back")}},
         }
 
     def put_layout(self, data):
-        layout, summary = self.store.save(data)
-        return {"layout": layout, "comfort": summary}
+        layout = self.store.save(data)
+        return {"layout": layout, "sets": sets_progress(self.store.cat, layout)}
 
 
 class RoomServer:

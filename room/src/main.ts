@@ -7,7 +7,7 @@ import {api} from './api';
 import {
   cellsOf, depthOf, footprint, hex, itemPolys, newId, placementError, pointInPoly, project, shade, slotsOf, unproject,
 } from './model';
-import type {Catalog, Comfort, Item, Layout, Placed, State} from './model';
+import type {Catalog, Item, Layout, Placed, SetState, State} from './model';
 import {Resident} from './resident';
 import type {Spot} from './resident';
 import {Ui} from './ui';
@@ -38,7 +38,7 @@ async function boot() {
 
   let layout: Layout = state.layout;
   let saved: Layout = structuredClone(layout);
-  let comfort: Comfort = state.comfort;
+  let sets: SetState[] = state.sets;
   let mode: Mode = {kind: 'none'};
   let hover: [number, number] | null = null;
 
@@ -164,20 +164,19 @@ async function boot() {
 
   async function save(mine: number) {
     if (mine !== edits) return;   // a newer edit is queued and will send this one's changes too
-    const before = comfort;
+    const before = sets;
     try {
       const r = await api.putLayout(layout);
       saved = structuredClone(r.layout);
-      comfort = r.comfort;
+      sets = r.sets;
       if (mine === edits) layout = r.layout;
       const news: string[] = [];
-      for (const s of comfort.sets) {
-        if (s.complete && !before.sets.find(x => x.id === s.id)?.complete) {
-          news.push(`集齐「${s.name}」！舒适度 +${s.bonus}`);
+      for (const s of sets) {
+        if (s.complete && !before.find(x => x.id === s.id)?.complete) {
+          news.push(`集齐「${s.name}」！`);
           resident.say(`集齐${s.name}啦！`);
         }
       }
-      if (comfort.level > before.level) news.push(`舒适度升到「${comfort.level_name}」`);
       if (news.length) ui.toast(news.join('　'));
     } catch (e) {
       layout = structuredClone(saved);
@@ -253,7 +252,7 @@ async function boot() {
     drawFurniture();
     drawOverlay();
     resident.refresh(spots());
-    ui.render(layout, comfort, mode.kind === 'selected' ? mode.id : null);
+    ui.render(layout, sets, mode.kind === 'selected' ? mode.id : null);
     if (mode.kind === 'selected') {
       const v = itemViews.get(mode.id);
       if (v) {
@@ -298,7 +297,7 @@ async function boot() {
 
   fit();
   setMode({kind: 'none'});
-  resident.say(comfort.total ? `欢迎回来～舒适度 ${comfort.total}` : '空荡荡的……摆点家具吧！', 3.5);
+  resident.say(layout.placed.length ? '欢迎回来～' : '空荡荡的……摆点家具吧！', 3.5);
 }
 
 function mix(a: number, b: number): number {

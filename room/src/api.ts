@@ -1,7 +1,7 @@
 // The page's only way to the pet: three calls to RoomAPI in room.py. Today they
 // go over HTTP to the pet's 127.0.0.1 server; under Electron this file becomes
 // three ipcRenderer.invoke calls and nothing else changes.
-import type {Catalog, Comfort, Layout, State} from './model';
+import type {Catalog, Layout, SetState, State} from './model';
 
 const token = new URLSearchParams(location.search).get('t') ?? '';
 
@@ -19,5 +19,5 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 export const api = {
   catalog: () => call<Catalog>('GET', '/api/catalog'),
   state: () => call<State>('GET', '/api/state'),
-  putLayout: (layout: Layout) => call<{layout: Layout; comfort: Comfort}>('PUT', '/api/layout', layout),
+  putLayout: (layout: Layout) => call<{layout: Layout; sets: SetState[]}>('PUT', '/api/layout', layout),
 };

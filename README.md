@@ -123,7 +123,7 @@ dsh-pet 的动画是同一个大肥鱼形象的完整视频（640×360、24 帧�
 ### 后宅
 
 一个 8×8 的等距视角小屋：左边挑家具摆进去（旋转、移动、收起），换墙纸地板。家具都免费，没有货币。
-每件家具有舒适度，凑齐「海边小屋」「安静书房」「健身角」套装再加一笔；舒适度越高，桌面上的她闲着时越常做开心、比心、得意的表情。
+家具分成「海边小屋」「安静书房」「健身角」三个套装，右上角显示每套摆齐了几件，集齐时弹提示。
 她也住在房间里：走来走去，走到家具的姿势槽位上坐着、躺着、睡觉、看书、锻炼、喝水。
 
 ![后宅](docs/room.jpg)
@@ -225,7 +225,7 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 | `启动大肥鱼.command` | macOS 双击启动脚本 |
 | `tower/` | 爬塔（Vite + TypeScript），和桌宠不共用代码，见 [tower/README.md](tower/README.md) |
 | `content/tower/` | 爬塔打包好的单文件网页（`npm run release` 生成，提交进仓库），桌宠的 🗼 入口打开它 |
-| `room.py` | 后宅的数据：家具目录、布局校验、舒适度和套装、存档、本机 HTTP 服务 |
+| `room.py` | 后宅的数据：家具目录、布局校验、套装进度、存档、本机 HTTP 服务 |
 | `room/` | 后宅网页（Vite + TypeScript + PixiJS），见 [room/README.md](room/README.md) |
 | `content/room/` | 后宅的家具目录（`catalog.json`）和打包好的单文件网页（`npm run release` 生成，提交进仓库） |
 | `build/大肥鱼.app` | macOS 上启动时自动生成：把解释器放进这个壳里运行，程序坞和 ⌘Tab 就显示「大肥鱼」而不是 Python |

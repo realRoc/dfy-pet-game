@@ -1,7 +1,7 @@
 // DOM side of the room: furniture catalog, wallpaper and floor pickers, the
-// comfort card, the toolbar for a selected piece, hints and toasts.
+// set progress card, the toolbar for a selected piece, hints and toasts.
 import {itemPolys, project} from './model';
-import type {Catalog, Comfort, Item, Layout} from './model';
+import type {Catalog, Item, Layout, SetState} from './model';
 
 interface Actions {
   pick(itemId: string): void;
@@ -45,10 +45,10 @@ export class Ui {
 
   private last: Layout | null = null;
 
-  render(layout: Layout, comfort: Comfort, selected: string | null) {
+  render(layout: Layout, sets: SetState[], selected: string | null) {
     this.last = layout;
     this.renderList(layout);
-    this.renderComfort(comfort);
+    this.renderSets(sets);
     const sel = selected ? layout.placed.find(p => p.id === selected) : null;
     $('toolbar-name').textContent = sel ? this.cat.items.find(i => i.id === sel.item)?.name ?? '' : '';
   }
@@ -65,7 +65,7 @@ export class Ui {
         html += `<button class="card" data-id="${it.id}">
           <img src="${this.previews.get(it.id)}" alt="">
           <span class="name">${esc(it.name)}</span>
-          <span class="meta">舒适 +${it.comfort}${it.set ? ` · <i>${esc(setName.get(it.set) ?? '')}</i>` : ''}</span>
+          ${it.set ? `<span class="meta"><i>${esc(setName.get(it.set) ?? '')}</i></span>` : ''}
           ${n ? `<span class="count">已摆 ${n}</span>` : ''}
         </button>`;
       }
@@ -82,18 +82,13 @@ export class Ui {
     $('list').innerHTML = html;
   }
 
-  private renderComfort(c: Comfort) {
-    const levels = this.cat.comfort_levels;
-    const next = levels[c.level + 1];
-    const from = levels[c.level].min;
-    const pct = next ? Math.round((c.total - from) / (next.min - from) * 100) : 100;
+  private renderSets(sets: SetState[]) {
     const itemName = new Map(this.cat.items.map(i => [i.id, i.name]));
-    $('comfort').innerHTML = `
-      <div class="score"><b>${c.total}</b> 舒适度 · <span class="lv">${esc(c.level_name)}</span></div>
-      <div class="bar"><i style="width:${pct}%"></i></div>
-      <div class="sub">${next ? `再 ${next.min - c.total} 点升到「${esc(next.name)}」` : '满级啦'} · 家具 ${c.base} + 套装 ${c.set_bonus}</div>
-      <ul>${c.sets.map(s => `<li class="${s.complete ? 'done' : ''}" title="${s.complete ? '已集齐' : '还差：' + esc(s.missing.map(m => itemName.get(m) ?? m).join('、'))}">
-        <span>${s.complete ? '✅' : '◻️'} ${esc(s.name)}</span><span>${s.have}/${s.total} · +${s.bonus}</span></li>`).join('')}</ul>`;
+    const done = sets.filter(s => s.complete).length;
+    $('sets').innerHTML = `
+      <div class="score"><b>${done}</b>/${sets.length} 套装集齐</div>
+      <ul>${sets.map(s => `<li class="${s.complete ? 'done' : ''}" title="${s.complete ? '已集齐' : '还差：' + esc(s.missing.map(m => itemName.get(m) ?? m).join('、'))}">
+        <span>${s.complete ? '✅' : '◻️'} ${esc(s.name)}</span><span>${s.have}/${s.total}</span></li>`).join('')}</ul>`;
   }
 
   showToolbar(x: number, y: number) {

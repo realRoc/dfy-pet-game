@@ -112,48 +112,38 @@ class LayoutTest(unittest.TestCase):
             room.validate_layout(self.cat, self.layout(*many))
 
 
-class ComfortTest(unittest.TestCase):
+class SetsTest(unittest.TestCase):
     def setUp(self):
         self.cat = room.load_catalog()
 
-    def summary(self, *placed):
-        return room.comfort(self.cat, room.validate_layout(self.cat, {"placed": list(placed)}))
+    def progress(self, *placed):
+        sets = room.sets_progress(self.cat, room.validate_layout(self.cat, {"placed": list(placed)}))
+        return {x["id"]: x for x in sets}
 
     def test_empty_room(self):
-        s = self.summary()
-        self.assertEqual((s["total"], s["level"], s["set_bonus"]), (0, 0, 0))
-        self.assertEqual(room.mood_bonus(s), 0)
+        p = self.progress()
+        self.assertEqual(set(p), {s["id"] for s in self.cat["sets"]})
+        self.assertTrue(all(x["have"] == 0 and not x["complete"] for x in p.values()))
 
-    def test_sum_and_stack_limit(self):
-        stool = self.cat["by_id"]["coral_stool"]["comfort"]   # stack 2
-        s = self.summary(place("a", "coral_stool", 0, 0), place("b", "coral_stool", 1, 0), place("c", "coral_stool", 2, 0))
-        self.assertEqual(s["base"], stool * 2)
-        bed = self.cat["by_id"]["shell_bed"]["comfort"]       # stack 默认 1
-        s = self.summary(place("a", "shell_bed", 0, 0), place("b", "shell_bed", 2, 0))
-        self.assertEqual(s["base"], bed)
-
-    def test_set_bonus_only_when_complete(self):
+    def test_complete_only_when_every_piece_is_placed(self):
         gym = [it["id"] for it in self.cat["items"] if it.get("set") == "gym"]
         spots = [(0, 0), (2, 0), (4, 0)]
-        partial = self.summary(*[place(f"g{i}", iid, *spots[i]) for i, iid in enumerate(gym[:-1])])
-        gs = next(s for s in partial["sets"] if s["id"] == "gym")
+        gs = self.progress(*[place(f"g{i}", iid, *spots[i]) for i, iid in enumerate(gym[:-1])])["gym"]
         self.assertEqual((gs["have"], gs["total"], gs["complete"]), (len(gym) - 1, len(gym), False))
         self.assertEqual(gs["missing"], [gym[-1]])
-        self.assertEqual(partial["set_bonus"], 0)
-        full = self.summary(*[place(f"g{i}", iid, *spots[i]) for i, iid in enumerate(gym)])
-        gs = next(s for s in full["sets"] if s["id"] == "gym")
+        gs = self.progress(*[place(f"g{i}", iid, *spots[i]) for i, iid in enumerate(gym)])["gym"]
         self.assertTrue(gs["complete"])
-        self.assertEqual(full["set_bonus"], gs["bonus"])
-        self.assertEqual(full["total"], full["base"] + gs["bonus"])
+        self.assertEqual(gs["missing"], [])
 
-    def test_full_room_reaches_top_level(self):
+    def test_duplicates_count_once(self):
+        p = self.progress(place("a", "coral_stool", 0, 0), place("b", "coral_stool", 1, 0))
+        self.assertEqual(p["seaside"]["have"], 1)
+
+    def test_full_room_completes_every_set(self):
         spots = iter([(0, 0), (2, 0), (5, 0), (0, 3), (2, 3), (4, 3), (6, 2), (7, 0), (0, 6), (2, 6),
                       (4, 6), (6, 5), (7, 7), (5, 5)])
         placed = [place(f"i{n}", it["id"], *next(spots)) for n, it in enumerate(self.cat["items"])]
-        s = self.summary(*placed)
-        self.assertTrue(all(x["complete"] for x in s["sets"]))
-        self.assertEqual(s["level"], s["max_level"], s)
-        self.assertEqual(room.mood_bonus(s), 1)
+        self.assertTrue(all(x["complete"] for x in self.progress(*placed).values()))
 
 
 class StoreTest(unittest.TestCase):
@@ -165,16 +155,14 @@ class StoreTest(unittest.TestCase):
     def test_new_store_is_empty_room(self):
         s = room.RoomStore(self.path)
         self.assertEqual(s.layout()["placed"], [])
-        self.assertEqual(s.comfort()["total"], 0)
         self.assertFalse(os.path.exists(self.path))
 
     def test_save_and_reload(self):
         s = room.RoomStore(self.path)
-        layout, summary = s.save({"floor": "floor_tile", "placed": [place("a", "beanbag", 3, 3, 2)]})
-        self.assertEqual(summary["total"], room.load_catalog()["by_id"]["beanbag"]["comfort"])
+        layout = s.save({"floor": "floor_tile", "placed": [place("a", "beanbag", 3, 3, 2)]})
+        self.assertEqual(layout["floor"], "floor_tile")
         again = room.RoomStore(self.path)
         self.assertEqual(again.layout(), layout)
-        self.assertEqual(again.comfort(), summary)
 
     def test_invalid_save_keeps_old_layout(self):
         s = room.RoomStore(self.path)
@@ -250,13 +238,15 @@ class ServerTest(unittest.TestCase):
         status, st = self.request("GET", "/api/state")
         self.assertEqual(status, 200)
         self.assertEqual(st["layout"]["placed"], [])
-        self.assertEqual(st["comfort"]["total"], 0)
+        self.assertEqual({x["id"] for x in st["sets"]}, {x["id"] for x in self.store.cat["sets"]})
+        self.assertNotIn("comfort", st)
         self.assertEqual(st["character"]["sprites"]["front"], "/character/front.png")
 
     def test_put_layout(self):
         status, r = self.request("PUT", "/api/layout", {"placed": [place("a", "pothos", 1, 1)]})
         self.assertEqual(status, 200)
-        self.assertEqual(r["comfort"]["total"], self.store.cat["by_id"]["pothos"]["comfort"])
+        self.assertEqual(r["layout"]["placed"], [place("a", "pothos", 1, 1)])
+        self.assertIn("sets", r)
         self.assertEqual(self.store.layout()["placed"], [place("a", "pothos", 1, 1)])
         status, r = self.request("PUT", "/api/layout", {"placed": [place("a", "pothos", 8, 1)]})
         self.assertEqual(status, 400)
@@ -337,7 +327,9 @@ class PetRoomEntryTest(unittest.TestCase):
         self.addCleanup(lambda: self.pet.room_server and self.pet.room_server.stop())
 
     def test_room_save_lives_in_data_dir(self):
-        self.assertEqual(self.pet.room.path, os.path.join(self.tmp, "room.json"))
+        with mock.patch.object(QDesktopServices, "openUrl", return_value=True):
+            self.pet.open_room()
+        self.assertEqual(self.pet.room_server.api.store.path, os.path.join(self.tmp, "room.json"))
 
     def test_panel_button_opens_room_in_browser(self):
         opened = []
@@ -357,13 +349,6 @@ class PetRoomEntryTest(unittest.TestCase):
     def test_menu_has_room(self):
         texts = [a.text() for a in self.pet._build_menu().actions()]
         self.assertIn("🏠 后宅", texts)
-
-    def test_comfort_raises_happy_expressions(self):
-        with mock.patch("random.random", return_value=0.3):
-            self.assertIsNone(self.pet._mood_expression())   # 空房间：随机表情
-        full = dict(self.pet.room.comfort(), level=4, max_level=4)
-        with mock.patch.object(self.pet.room, "comfort", return_value=full), mock.patch("random.random", return_value=0.3):
-            self.assertIn(self.pet._mood_expression(), ("happy", "love", "smug"))
 
 
 if __name__ == "__main__":

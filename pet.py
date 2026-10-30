@@ -6,7 +6,7 @@
 - 新增 dsh-pet 的动作动画（舞狮、玩玩具汽车……，clips.py），放进「做个表情」，闲着时也会自己播
 - 新增健身跟练（workout.py）：按训练计划做动作、报下一个，右上角两位数倒计时（红色练、绿色歇）
 - 新增喝水提醒（water.py）：到点递水壶，不理就一级级加码，最后扔大水砸碎屏幕、气跑，过一会儿再回来
-- 新增后宅（room.py + room/ 网页）：摆家具、凑套装，舒适度越高，闲着时越常做开心的表情
+- 新增后宅（room.py + room/ 网页）：摆家具、凑套装
 - 天气查询改到后台线程，不卡界面
 """
 import datetime
@@ -65,7 +65,6 @@ INNER_LINES = CHAR.lines("inner")
 DRAG_LINES = CHAR.lines("drag")
 FOOD_LINES = CHAR.lines("food", {})
 SYSTEM_LINES = CHAR.lines("system", {})
-MOOD_EXPRESSIONS = ["happy", "love", "smug"]   # 后宅舒服时闲着更常做的表情
 FOODS = ["🐟", "🍰", "🍭", "🍡", "💎"]
 
 # 自启项的名字沿用飞行棋时期的，已经开过自启的用户关掉时还能删到
@@ -291,8 +290,7 @@ class PetWindow(QWidget):
         self._water_idle = 0.0
         self._water_idle_left = 0.0
         self._last_offer = None
-        # 后宅：布局存档一启动就读（舒适度影响心情），网页服务等第一次打开后宅再起
-        self.room = room.RoomStore(os.path.join(DATA_DIR, "room.json"))
+        # 后宅：第一次打开时才读存档、起网页服务
         self.room_server = None
         self._layout_for_size()
 
@@ -1157,8 +1155,8 @@ class PetWindow(QWidget):
             elif pick < 0.65:
                 self.action, self.action_t = "stretch", 1.0
             elif pick < 0.7:
-                # 偶尔自己冒个表情，不说话；后宅越舒服，越常是开心类的
-                self.expr.start(self._mood_expression())
+                # 偶尔自己冒个表情，不说话
+                self.expr.start()
             elif pick < 0.8:
                 if not (clips.AVAILABLE and self.play_clip()):
                     self.expr.start()
@@ -1388,17 +1386,12 @@ class PetWindow(QWidget):
             print("爬塔打开失败:", TOWER_HTML)
             self.say("浏览器没打开，手动打开 content/tower/index.html")
 
-    def _mood_expression(self):
-        """闲着时挑哪个表情：后宅舒适度满级时有六成是开心类的，空房间就全随机。"""
-        if random.random() < 0.6 * room.mood_bonus(self.room.comfort()):
-            return random.choice(MOOD_EXPRESSIONS)
-        return None
-
     def open_room(self):
         """在系统浏览器里打开后宅。数据在桌宠这边（room.json），网页通过本机的小服务读写。"""
         try:
             if self.room_server is None:
-                self.room_server = room.RoomServer(room.RoomAPI(self.room)).start()
+                store = room.RoomStore(os.path.join(DATA_DIR, "room.json"))
+                self.room_server = room.RoomServer(room.RoomAPI(store)).start()
         except OSError as e:
             print("后宅服务起不来:", e)
             self.say("后宅打不开，过会儿再试试")

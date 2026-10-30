@@ -6,27 +6,23 @@ export type Vec3 = [number, number, number];
 export interface Box { at: Vec3; size: Vec3; color: string }
 export interface Slot { pose: string; at: [number, number]; z?: number }
 export interface Item {
-  id: string; name: string; set?: string; comfort: number; size: [number, number];
-  layer: 'object' | 'rug'; stack?: number; boxes: Box[]; slots?: Slot[];
+  id: string; name: string; set?: string; size: [number, number];
+  layer: 'object' | 'rug'; boxes: Box[]; slots?: Slot[];
 }
 export interface Surface { id: string; name: string; color: string; trim?: string; alt?: string }
 export interface Catalog {
   room: {w: number; d: number};
   poses: Record<string, {label: string}>;
-  comfort_levels: {min: number; name: string}[];
   wallpapers: Surface[];
   floors: Surface[];
-  sets: {id: string; name: string; bonus: number}[];
+  sets: {id: string; name: string}[];
   items: Item[];
 }
 export interface Placed { id: string; item: string; x: number; y: number; rot: number }
 export interface Layout { version?: number; wallpaper: string; floor: string; placed: Placed[] }
-export interface SetState { id: string; name: string; have: number; total: number; complete: boolean; bonus: number; missing: string[] }
-export interface Comfort {
-  total: number; base: number; set_bonus: number; level: number; level_name: string; max_level: number; sets: SetState[];
-}
+export interface SetState { id: string; name: string; have: number; total: number; complete: boolean; missing: string[] }
 export interface CharacterInfo { id: string; name: string; side_faces: 'left' | 'right'; sprites: {front: string; side: string; back: string} }
-export interface State { layout: Layout; comfort: Comfort; character: CharacterInfo }
+export interface State { layout: Layout; sets: SetState[]; character: CharacterInfo }
 
 // ---------- isometric projection ----------
 // Grid x runs to the lower right, grid y to the lower left, z up. (0, 0, 0) is the back corner of the floor.

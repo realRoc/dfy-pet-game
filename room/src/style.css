@@ -30,17 +30,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .card.swatch.on { border-color: var(--accent); }
 .chip { width: 100%; height: 48px; border-radius: 8px; border: 4px solid; }
 
-#comfort { position: fixed; right: 12px; top: 12px; width: 250px; padding: 12px 14px; background: var(--panel);
+#sets { position: fixed; right: 12px; top: 12px; width: 220px; padding: 12px 14px; background: var(--panel);
   border-radius: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25); font-size: 12px; }
-#comfort .score { font-size: 13px; }
-#comfort .score b { font-size: 24px; margin-right: 2px; }
-#comfort .lv { color: #c07a3a; font-weight: 600; }
-#comfort .bar { height: 6px; border-radius: 3px; background: #ece4d4; margin: 6px 0 4px; overflow: hidden; }
-#comfort .bar i { display: block; height: 100%; background: linear-gradient(90deg, #f2b84b, #ef8a76); }
-#comfort .sub { color: var(--muted); }
-#comfort ul { list-style: none; margin: 10px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); }
-#comfort li { display: flex; justify-content: space-between; padding: 3px 0; color: var(--muted); cursor: default; }
-#comfort li.done { color: var(--ink); font-weight: 600; }
+#sets .score { font-size: 13px; }
+#sets .score b { font-size: 24px; margin-right: 2px; }
+#sets ul { list-style: none; margin: 8px 0 0; padding: 8px 0 0; border-top: 1px solid var(--line); }
+#sets li { display: flex; justify-content: space-between; padding: 3px 0; color: var(--muted); cursor: default; }
+#sets li.done { color: var(--ink); font-weight: 600; }
 
 #toolbar { position: fixed; display: none; gap: 4px; align-items: center; padding: 5px 6px 5px 10px; background: #fff;
   border-radius: 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); font-size: 12px; }
