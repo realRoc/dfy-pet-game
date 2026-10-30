@@ -243,9 +243,13 @@ class FoodPanel(QWidget):
     def __init__(self, on_pick):
         super().__init__(None, float_flags())
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground)
         self.setFixedSize(310, 64)
-        lay = QHBoxLayout(self)
+
+        # 顶层透明窗口自己的样式表背景在 macOS 上画不出来，深色圆角底板画在里面这层上（和 ChatDialog 一样）
+        plate = QFrame(self)
+        plate.setGeometry(0, 0, 310, 64)
+        plate.setStyleSheet("QFrame{background:rgba(40,40,60,190);border-radius:14px;}")
+        lay = QHBoxLayout(plate)
         lay.setContentsMargins(12, 8, 12, 8)
         lay.setSpacing(8)
         for f in FOODS:
@@ -266,7 +270,6 @@ class FoodPanel(QWidget):
                             "QToolButton:hover{background:#ff7fa8;color:#fff;}")
         close.clicked.connect(self.hide)
         lay.addWidget(close)
-        self.setStyleSheet("FoodPanel{background:rgba(40,40,60,190);border-radius:14px;}")
 
     def popup_at(self, x, y):
         self.move(int(x - self.width() / 2), int(y - self.height() - 10))
