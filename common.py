@@ -13,10 +13,13 @@ if getattr(sys, "frozen", False):
 else:
     APP_DIR = os.path.dirname(os.path.abspath(__file__))
     BUNDLE_DIR = APP_DIR
+# 配置、自写的训练计划、macOS 的 .app 外壳这些要写的东西放这里。
+# 作为 dsh 插件跑时代码在 node_modules 里，升级会整个换掉，dsh 插件用 DFY_DATA_DIR 指到它自己的数据目录
+DATA_DIR = os.environ.get("DFY_DATA_DIR") or APP_DIR
 SPRITE_DIR = os.path.join(BUNDLE_DIR, "sprites")
 # 爬塔的单文件网页（tower/ 里 npm run release 生成），桌宠用系统浏览器打开它
 TOWER_HTML = os.path.join(BUNDLE_DIR, "content", "tower", "index.html")
-CONFIG_PATH = os.path.join(APP_DIR, "config.json")
+CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 
 IS_MAC = sys.platform == "darwin"
 IS_WIN = sys.platform == "win32"
@@ -80,7 +83,7 @@ def relaunch_in_mac_app():
         import filecmp
         import plistlib
         import shutil
-        contents = os.path.join(APP_DIR, "build", f"{APP_NAME}.app", "Contents")
+        contents = os.path.join(DATA_DIR, "build", f"{APP_NAME}.app", "Contents")
         exe = os.path.join(contents, "MacOS", APP_NAME)
         if not (os.path.isfile(exe) and filecmp.cmp(src, exe, shallow=False)):
             os.makedirs(os.path.dirname(exe), exist_ok=True)
@@ -123,6 +126,7 @@ def load_config():
 
 def save_config(cfg):
     try:
+        os.makedirs(DATA_DIR, exist_ok=True)
         with open(CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(cfg, f, ensure_ascii=False, indent=2)
     except Exception as e:

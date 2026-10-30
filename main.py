@@ -68,6 +68,9 @@ def main():
     qapp.setWindowIcon(QIcon(os.path.join(SPRITE_DIR, "icon.png")))
     app = PetApp(qapp)
     qapp.aboutToQuit.connect(lambda: save_config(app.cfg))
+    if os.environ.get("DFY_CONTROL") == "stdin":  # 作为 dsh 插件的子进程跑
+        import control
+        app.control = control.attach(app)
     sys.exit(qapp.exec())
 
 
