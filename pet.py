@@ -50,7 +50,9 @@ BUBBLE_H = 56
 MARGIN = 4
 SIZE_LEVELS = {"小": 0.55, "中": 0.7, "大": 0.9}
 SPEED = 380.0
-TICK = 20
+TICK = 20          # 一步逻辑的时长（毫秒）：走路、表情、动画、计时、随机概率都按步算
+IDLE_FRAME = 60    # 闲着只剩呼吸、轻摇时的帧间隔（约 16 帧/秒），一帧推 3 步；头顶一帧最多挪一个点，看不出来
+HIDDEN_FRAME = 200  # 窗口藏起来（气跑了）不用画，只让喝水提醒照样计时
 ROUND_CHOICES = [("按计划", 0), ("1 轮", 1), ("2 轮", 2), ("3 轮", 3), ("4 轮", 4)]
 
 LINES = [
@@ -356,7 +358,7 @@ class PetWindow(QWidget):
         self.chat_dialog = ChatDialog(self)
 
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self.tick)
+        self.timer.timeout.connect(self._frame)
         self.timer.start(TICK)
 
         self.bubble_font = QFont(UI_FONT)
@@ -657,6 +659,39 @@ class PetWindow(QWidget):
         if facing is not None and facing != self.facing:
             self.facing = facing
 
+    # ---------- 帧率 ----------
+    def _calm(self):
+        """画面只剩呼吸和轻轻摇摆（还有抠门模式头顶慢慢飘的字）：可以降帧。别的一律 50 帧。"""
+        return not (self.target is not None or self.water_walk or self.dragging or self.jump_t > 0
+                    or self.cross_t > 0 or self.action or self.expr.active or self.clip.active
+                    or self.workout is not None or self.water_fx or self._water_next is not None
+                    or (self.bubble_text and self.t * TICK / 1000.0 < self.bubble_until))
+
+    def _frame_ms(self):
+        if not self.isVisible():
+            return HIDDEN_FRAME
+        return IDLE_FRAME if self._calm() else TICK
+
+    def _frame(self):
+        """定时器跳一下：按帧间隔补上这么多步逻辑，所以降帧不改变任何计时；
+        补到一半动起来了（要走路、冒表情、蹦一下）就不补了，马上换回 50 帧。"""
+        interval = self.timer.interval()
+        for _ in range(max(1, interval // TICK)):
+            self.tick()
+            if self._frame_ms() < interval:
+                break
+        self._pace()
+
+    def _pace(self):
+        """按现在的状态调帧间隔。菜单、鼠标、dsh 指令这些外面来的动静也调一下，不用等下一个慢帧。"""
+        ms = self._frame_ms()
+        if self.timer.isActive() and ms != self.timer.interval():
+            self.timer.start(ms)
+
+    def showEvent(self, e):
+        super().showEvent(e)
+        self._pace()
+
     # ---------- 逻辑 ----------
     def tick(self):
         if not self.isVisible():
@@ -791,6 +826,7 @@ class PetWindow(QWidget):
                                      use_clips=True)
         self.announcer.voice = self.cfg.get("workout_voice", True) and prep
         self._relayout()
+        self._pace()
 
     def stop_workout(self, finished=False):
         if self.workout is None:
@@ -922,6 +958,7 @@ class PetWindow(QWidget):
             self.last_line = ""
             self.say(text)
         self._water_next = then
+        self._pace()
         return ok
 
     def _water_level(self, level, welcome=False):
@@ -947,6 +984,7 @@ class PetWindow(QWidget):
         self.stop_clip()
         self.expr.stop()
         self.water_walk = {"to": (tx, ty), "speed": 1.0, "then": then}
+        self._pace()
 
     def _step_water_walk(self):
         w = self.water_walk
@@ -1161,6 +1199,7 @@ class PetWindow(QWidget):
         self.bubble_text = f"（{text}）" if inner else text
         self.bubble_until = self.t * TICK / 1000.0 + 2.8
         self.update()
+        self._pace()
 
     def _busy_training(self):
         if self.workout:
@@ -1194,6 +1233,7 @@ class PetWindow(QWidget):
         self.clip.lib, self.clip_mirror = None, False
         ok = self.clip.start(name) is not None
         self._relayout()
+        self._pace()
         return ok
 
     def play_random(self):
@@ -1251,6 +1291,7 @@ class PetWindow(QWidget):
                 self.expr.stop()
                 self.stop_clip()
                 self.drag_offset = e.globalPosition().toPoint() - QPoint(self.x(), self.y())
+                self._pace()
             if self.dragging and self.drag_offset is not None:
                 self.move(e.globalPosition().toPoint() - self.drag_offset)
                 if abs(delta.x()) > 10:
@@ -1300,6 +1341,7 @@ class PetWindow(QWidget):
                 self.jump_t = 1.0
             if random.random() < 0.6:
                 self.say(random.choice(REACT_LINES))
+            self._pace()
         panel = self.function_panel
         panel.popup_at(self.x() + self.width() / 2 - panel.width() / 2,
                        self.y() + self.head_room - BUBBLE_H - panel.height() + 10)
