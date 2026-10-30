@@ -137,6 +137,35 @@ pip install -r requirements.txt
 python main.py
 ```
 
+### 装进 DeepSeek Harness（dsh 插件）
+
+整个仓库也是一个 dsh 插件包 `dsh-dfy-pet`：装上以后 dsh 一开，大肥鱼就出现在桌面上，dsh 退出时一起退。
+
+```bash
+npm pack                                             # 打出 dsh-dfy-pet-<版本>.tgz（约 100 MB）
+dsh plugin --profile web add /绝对路径/dsh-dfy-pet-0.1.0.tgz
+```
+
+`<profile>` 按你用的界面填：`dsh web` 填 `web`，桌面版填 `desktop`。发布到 npm 以后改成 `dsh plugin --profile web add dsh-dfy-pet`，或者在插件页的「添加插件」里填 `dsh-dfy-pet`。
+tgz 的路径别太长（放在临时目录深处时 pnpm 会报 `ENAMETOOLONG`）。
+
+- **Python 环境**：插件第一次启动时在 `~/.dsh/plugins-data/dfy-pet/venv` 建虚拟环境，装 `requirements.txt`。
+  有 [uv](https://docs.astral.sh/uv/) 就用 uv，优先用系统里的 Python，没有就让 uv 下载一个，所以没装 Python 的机器也能跑；没有 uv 时退回系统 `python3 -m venv` + pip。
+  第一次要下载 PySide6，等一两分钟；之后 `requirements.txt` 不变就直接复用。
+- **数据**：配置、自己写的训练计划、macOS 的 `大肥鱼.app` 外壳都放在 `~/.dsh/plugins-data/dfy-pet/`，升级插件不会丢（桌宠代码在 dsh 的 `node_modules` 里，升级会整个换掉）。
+- **QQ 里聊天**：再装官方的 QQ 机器人插件 `@tencent-connect/dsh-qqbot`，在 dsh 的「QQ 机器人」里用手机 QQ 扫码绑定，
+  然后在 profile 的 `cordis.patch.yml`（`~/.dsh/profiles/web/cordis.patch.yml`）里加上下面几行，QQ 里的人就是在和大肥鱼聊：
+
+  ```yaml
+  - id: im-qqbot
+    config:
+      preset: dfy-qq
+  ```
+
+  `dfy-qq` 这个 preset 是本插件带的：系统提示词只有大肥鱼的人设，工具只有 `dafeiyu_desktop`（让主人桌面上的大肥鱼冒一句话、做个表情、跳一段，20 秒最多一次），**没有 shell 和文件工具**。
+  不设它的话 QQ 会话用 dsh 的标准模式，带 bash 和文件读写，审批按钮还会发给 QQ 里聊天的人，等于让陌生人在你电脑上跑命令。
+- **dsh 怎么指挥桌宠**：插件把桌宠当子进程起（`DFY_CONTROL=stdin`），往它的 stdin 一行写一条 JSON，格式见 [`control.py`](control.py)；管道断了桌宠就退出。
+
 ### 爬塔
 
 从桌宠点 🗼（单击面板或右键菜单）就能玩，不需要装 node：桌宠会用系统浏览器打开仓库里打包好的 `content/tower/index.html`。
@@ -178,6 +207,9 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 | `tower/` | 爬塔（Vite + TypeScript），和桌宠不共用代码，见 [tower/README.md](tower/README.md) |
 | `content/tower/` | 爬塔打包好的单文件网页（`npm run release` 生成，提交进仓库），桌宠的 🗼 入口打开它 |
 | `build/大肥鱼.app` | macOS 上启动时自动生成：把解释器放进这个壳里运行，程序坞和 ⌘Tab 就显示「大肥鱼」而不是 Python |
+| `control.py` | dsh 插件指挥桌宠的 stdin 通道（说话、表情、动作动画、显示） |
+| `package.json`、`cordis.patch.yml` | dsh 插件包清单和挂载声明（宿主插件 + QQ 用的 `dfy-qq` preset） |
+| `dsh/` | dsh 插件的 Node 部分：`index.js` 起桌宠子进程，`python-env.js` 建 Python 环境，`tool.js` 是 QQ 会话里的 `dafeiyu_desktop` 工具 |
 
 ## 致谢与引用
 

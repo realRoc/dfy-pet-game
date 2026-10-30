@@ -23,14 +23,14 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QPixmap
 
 import clips as clip_lib
-from common import APP_DIR, BUNDLE_DIR, IS_MAC, IS_WIN, emoji_font
+from common import BUNDLE_DIR, DATA_DIR, IS_MAC, IS_WIN, emoji_font
 
 WORKOUT_DIR = os.path.join(BUNDLE_DIR, "content", "workout")
 FRAME_DIR = os.path.join(WORKOUT_DIR, "frames")
 CLIP_DIR = os.path.join(WORKOUT_DIR, "clips")
 CLIP_FADE = 0.15   # 片段开头结尾和正面图叠化几秒：视频比原画软一点，硬切会闪一下；左边的镜像也靠它带过去
 BUILTIN_PLAN_DIR = os.path.join(WORKOUT_DIR, "plans")
-USER_PLAN_DIR = os.path.join(APP_DIR, "workouts")
+USER_PLAN_DIR = os.path.join(DATA_DIR, "workouts")
 
 PREP_SECS = 5
 FINISH_SECS = 9    # 练完：欢呼 3 秒，再瘫倒一会儿

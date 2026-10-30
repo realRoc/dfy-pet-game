@@ -29,7 +29,7 @@ class RelaunchInMacAppTest(unittest.TestCase):
         env = {k: v for k, v in os.environ.items() if k not in ("DFY_IN_APP", "__PYVENV_LAUNCHER__")}
         for p in (
             mock.patch.object(common, "IS_MAC", True),
-            mock.patch.object(common, "APP_DIR", self.app_dir),
+            mock.patch.object(common, "DATA_DIR", self.app_dir),
             mock.patch.object(sys, "base_prefix", self.base),
             mock.patch.object(sys, "executable", "/venv/bin/python"),
             mock.patch.object(sys, "argv", ["main.py", "--flag"]),

@@ -1,0 +1,50 @@
+{
+  "name": "dsh-dfy-pet",
+  "version": "0.1.1",
+  "description": "大肥鱼桌宠的 DeepSeek Harness 插件：dsh 一开，鲸鱼娘大肥鱼就到桌面上散步、做表情、陪你健身、催你喝水；配合 QQ 机器人插件还能在 QQ 里用大肥鱼的身份聊天，聊到开心时桌面上的她也会冒泡。",
+  "icon": "sprites/icon.png",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "desktop-pet",
+    "pet",
+    "qqbot",
+    "cordis"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "dsh/index.js",
+  "exports": {
+    ".": "./dsh/index.js",
+    "./tool": "./dsh/tool.js",
+    "./locale/*.json": "./dsh/locale/*.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dsh/",
+    "cordis.patch.yml",
+    "*.py",
+    "requirements.txt",
+    "sprites/",
+    "content/",
+    "LICENSE*"
+  ],
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "compatibility": {
+      "dshReleases": {
+        "0.2.1-rc.2": "compatible"
+      }
+    }
+  }
+}
