@@ -14,6 +14,7 @@ class PetApp:
     def __init__(self, qapp):
         self.qapp = qapp
         self.cfg = load_config()
+        self.im = self._make_im()   # 要在 PetWindow 之前：功能面板、右键菜单看它有没有决定出不出「连接 IM」
         self.pet = PetWindow(self, self.cfg)
 
         # 托盘（macOS 是菜单栏图标）：鼠标穿透后从这里解除
@@ -30,6 +31,17 @@ class PetApp:
         self._show(self.pet)
         self.pet.snap_into_screen()
         self.pet.apply_passthrough_from_cfg()
+        if self.im:
+            self.im.start_enabled()
+
+    def _make_im(self):
+        """IM 机器人（im/）。依赖没装（discord.py / aiohttp）就是 None，入口也不出现。"""
+        try:
+            from im.qt import IMService
+        except Exception as e:
+            print("IM 机器人不可用:", e)
+            return None
+        return IMService(self) if IMService.platforms() else None
 
     def _show(self, w):
         w.show()
@@ -55,6 +67,8 @@ class PetApp:
     def quit(self):
         self.cfg["x"], self.cfg["y"] = self.pet.x(), self.pet.y()
         save_config(self.cfg)
+        if self.im:
+            self.im.shutdown()
         self.pet.announcer.stop()
         self.tray.hide()
         self.qapp.quit()

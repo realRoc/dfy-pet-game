@@ -33,6 +33,7 @@ from clips import ClipPlayer
 import workout
 from workout import WorkoutPlayer, FrameCache, Announcer
 import water
+import llm
 
 try:
     import pynvml
@@ -41,9 +42,7 @@ try:
 except Exception:
     GPU_AVAILABLE = False
 
-# ===== DeepSeek 配置 =====
-DS_BASE_URL = "https://api.deepseek.com/v1"
-DS_MODEL = "deepseek-chat"
+# ===== DeepSeek 配置（请求本身在 llm.py，IM 机器人也用它）=====
 DS_SYSTEM = "你是桌面宠物大肥鱼，贱兮兮但可爱，每句话不超过25字，偶尔吐槽主人但别真骂人。"
 
 BUBBLE_H = 56
@@ -182,16 +181,21 @@ class ChatDialog(QDialog):
 
 
 class FunctionPanel(QFrame):
-    """单击弹出的功能列表：聊天 / 爬塔"""
+    """单击弹出的功能列表：聊天 / 爬塔 / 跟练（/ 连接 IM）"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(float_flags())
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setFixedSize(176, 60)
+        buttons = [("🗨️", "聊天", self._on_chat_clicked), ("🗼", "爬塔", self._on_tower_clicked),
+                   ("🏋️", "跟练", self._on_workout_clicked)]
+        if parent is not None and getattr(parent.app, "im", None):
+            buttons.append(("🔗", "连接 IM", lambda: (self.hide(), parent.app.im.open_dialog())))
+        width = 16 + 52 * len(buttons) + 2 * (len(buttons) - 1)
+        self.setFixedSize(width, 60)
 
         # 顶层透明窗口自己的样式表背景画不出来，白底圆角画在里面这层上（和 ChatDialog 一样）
         container = QFrame(self)
-        container.setGeometry(0, 0, 176, 60)
+        container.setGeometry(0, 0, width, 60)
         container.setStyleSheet("""
             QFrame {
                 background: rgba(255, 255, 255, 0.92);
@@ -211,8 +215,7 @@ class FunctionPanel(QFrame):
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(2)
 
-        for icon, tip, fn in (("🗨️", "聊天", self._on_chat_clicked), ("🗼", "爬塔", self._on_tower_clicked),
-                              ("🏋️", "跟练", self._on_workout_clicked)):
+        for icon, tip, fn in buttons:
             b = QPushButton(icon)
             b.setFont(emoji_font(26))
             b.setToolTip(tip)
@@ -435,29 +438,17 @@ class PetWindow(QWidget):
         messages.append({"role": "user", "content": user_msg})
 
         def worker():
-            headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
-            payload = {"model": DS_MODEL, "messages": messages, "max_tokens": 100, "temperature": 0.9}
             try:
-                resp = requests.post(f"{DS_BASE_URL}/chat/completions", json=payload, headers=headers, timeout=10)
-                if resp.status_code == 200:
-                    reply = resp.json()["choices"][0]["message"]["content"].strip()
-                    if len(reply) > 30:
-                        reply = reply[:28] + "…"
-                    self.chat_history.append({"role": "user", "content": user_msg})
-                    self.chat_history.append({"role": "assistant", "content": reply})
-                    if len(self.chat_history) > self.max_history:
-                        self.chat_history = self.chat_history[-self.max_history:]
-                    self._queue_say(reply)
-                else:
-                    error_msg = resp.json().get("error", {}).get("message", str(resp.status_code))
-                    self._queue_say(f"API错误: {error_msg[:12]}")
-                    print(f"[DeepSeek] 状态码: {resp.status_code}, 返回: {resp.text}")
-            except requests.exceptions.Timeout:
-                self._queue_say("请求超时，检查网络")
-            except requests.exceptions.ConnectionError:
-                self._queue_say("连接失败，检查网络")
-            except Exception as e:
-                self._queue_say(f"请求失败: {str(e)[:12]}")
+                reply = llm.chat(key, messages)
+                if len(reply) > 30:
+                    reply = reply[:28] + "…"
+                self.chat_history.append({"role": "user", "content": user_msg})
+                self.chat_history.append({"role": "assistant", "content": reply})
+                if len(self.chat_history) > self.max_history:
+                    self.chat_history = self.chat_history[-self.max_history:]
+                self._queue_say(reply)
+            except llm.LLMError as e:
+                self._queue_say(str(e))
             finally:
                 self.ds_busy = False
 
@@ -1441,6 +1432,8 @@ class PetWindow(QWidget):
             a.setChecked(abs(self.cur_h - SPRITE_SRC_H * mult) < 2)
             a.triggered.connect(lambda _, v=mult: self.set_size(v))
         m.addAction("设置 Key", self._set_key_dialog)
+        if getattr(self.app, "im", None):   # 没装 IM 依赖时不出现
+            m.addAction("🔗 连接 IM", self.app.im.open_dialog)
         m.addAction("设置城市", self._set_city_dialog)
         m.addAction("查看天气", self._get_weather)
         m.addSeparator()

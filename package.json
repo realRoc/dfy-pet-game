@@ -26,6 +26,7 @@
     "dsh/",
     "cordis.patch.yml",
     "*.py",
+    "im/",
     "requirements.txt",
     "sprites/",
     "content/",
