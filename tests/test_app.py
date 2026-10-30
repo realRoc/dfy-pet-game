@@ -52,6 +52,18 @@ class PetAppSmokeTest(unittest.TestCase):
         buttons = pet.function_panel.findChildren(QPushButton)
         self.assertEqual([b.toolTip() for b in buttons], ["聊天", "爬塔", "跟练"])
 
+    def test_chat_and_function_panel_are_hidden_windows(self):
+        """两个面板有父控件，不带窗口类型就成了桌宠窗口里的子控件：
+        聊天框一启动就显示在窗口外头，popup_at 给的屏幕坐标被当成窗口内坐标，弹出来看不见"""
+        pet = self.app.pet
+        for w in (pet.chat_dialog, pet.function_panel):
+            self.assertTrue(w.isWindow(), type(w).__name__)
+            self.assertFalse(w.isVisible(), type(w).__name__)
+        pet._on_single_click()
+        panel = pet.function_panel
+        self.assertTrue(panel.isVisible())
+        self.assertEqual(panel.mapToGlobal(QPoint(0, 0)), panel.pos())
+
     def test_topmost_and_toggle_visible(self):
         pet = self.app.pet
         pet.set_topmost(False)

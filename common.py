@@ -61,10 +61,11 @@ def emoji_font(px):
 
 
 def float_flags(topmost=True):
-    """无边框浮窗。macOS 上 Tool 窗口会在应用失焦时自动隐藏，只在 Windows 用它来隐藏任务栏图标。"""
+    """无边框浮窗。macOS 上 Tool 窗口会在应用失焦时自动隐藏，只在 Windows 用它来隐藏任务栏图标。
+    macOS 上也得带窗口类型：setWindowFlags 会整个换掉 flags，有父控件的面板（聊天框、功能面板）
+    不带 Window 就成了桌宠窗口里的子控件，按屏幕坐标 move 出去就看不见了。"""
     flags = Qt.WindowType.FramelessWindowHint
-    if IS_WIN:
-        flags |= Qt.WindowType.Tool
+    flags |= Qt.WindowType.Tool if IS_WIN else Qt.WindowType.Window
     if topmost:
         flags |= Qt.WindowType.WindowStaysOnTopHint
     return flags

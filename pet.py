@@ -187,7 +187,12 @@ class FunctionPanel(QFrame):
         super().__init__(parent)
         self.setWindowFlags(float_flags())
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        self.setStyleSheet("""
+        self.setFixedSize(176, 60)
+
+        # 顶层透明窗口自己的样式表背景画不出来，白底圆角画在里面这层上（和 ChatDialog 一样）
+        container = QFrame(self)
+        container.setGeometry(0, 0, 176, 60)
+        container.setStyleSheet("""
             QFrame {
                 background: rgba(255, 255, 255, 0.92);
                 border-radius: 14px;
@@ -202,7 +207,7 @@ class FunctionPanel(QFrame):
             QPushButton:hover { background: rgba(0,0,0,0.04); }
             QPushButton:pressed { background: rgba(0,0,0,0.08); }
         """)
-        layout = QHBoxLayout(self)
+        layout = QHBoxLayout(container)
         layout.setContentsMargins(8, 6, 8, 6)
         layout.setSpacing(2)
 
@@ -214,8 +219,6 @@ class FunctionPanel(QFrame):
             b.setFixedSize(52, 48)
             b.clicked.connect(fn)
             layout.addWidget(b)
-
-        self.setFixedSize(176, 60)
         self.hide()
 
     def _on_chat_clicked(self):
