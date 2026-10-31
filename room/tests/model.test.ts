@@ -1,7 +1,7 @@
 import {describe, expect, it} from 'vitest';
 import catalogJson from '../../content/room/catalog.json';
 import {
-  cellsOf, depthOf, footprint, itemPolys, placementError, pointInPoly, project, rotateBox, rotatePoint, slotsOf, unproject,
+  cellsOf, depthOf, footprint, itemPolys, orientBox, orientPoint, placementError, pointInPoly, project, slotsOf, unproject,
 } from '../src/model';
 import type {Catalog, Item, Placed} from '../src/model';
 
@@ -27,34 +27,37 @@ describe('projection', () => {
   });
 });
 
-describe('rotation', () => {
-  it('footprint swaps on odd turns', () => {
+describe('facing', () => {
+  it('footprint swaps when mirrored', () => {
     expect(footprint(item('shell_bed'), 0)).toEqual([2, 3]);
     expect(footprint(item('shell_bed'), 1)).toEqual([3, 2]);
-    expect(footprint(item('shell_bed'), 2)).toEqual([2, 3]);
+    expect(footprint(item('shell_bed'), 2)).toEqual([2, 3]);   // an old quarter-turn save
   });
 
-  it('every box stays inside the rotated footprint, and four turns are identity', () => {
+  it('every box stays inside the mirrored footprint, and mirroring twice is identity', () => {
     for (const it of cat.items) {
       for (const b of it.boxes) {
-        for (let r = 0; r < 4; r++) {
-          const rb = rotateBox(b, it.size, r);
-          const [fw, fd] = footprint(it, r);
-          expect(rb.at[0]).toBeGreaterThanOrEqual(-1e-9);
-          expect(rb.at[1]).toBeGreaterThanOrEqual(-1e-9);
-          expect(rb.at[0] + rb.size[0]).toBeLessThanOrEqual(fw + 1e-9);
-          expect(rb.at[1] + rb.size[1]).toBeLessThanOrEqual(fd + 1e-9);
-        }
-        const back = rotateBox(b, it.size, 4);
-        back.at.forEach((v, i) => expect(v).toBeCloseTo(b.at[i]));
+        const mb = orientBox(b, 1);
+        const [fw, fd] = footprint(it, 1);
+        expect(mb.at[0] + mb.size[0]).toBeLessThanOrEqual(fw + 1e-9);
+        expect(mb.at[1] + mb.size[1]).toBeLessThanOrEqual(fd + 1e-9);
+        expect(orientBox(mb, 1)).toEqual(b);
       }
     }
   });
 
-  it('points rotate with the footprint', () => {
-    // 2×3 bed, the slot near the foot end; a quarter turn puts the bed 3 wide and 2 deep
-    expect(rotatePoint([1, 1.6], [2, 3], 1)).toEqual([1.4, 1]);
-    expect(rotatePoint([1, 1.6], [2, 3], 2)).toEqual([1, 3 - 1.6]);
+  it('mirroring flips the screen left-right about the back corner', () => {
+    const bed = item('shell_bed');
+    const a = itemPolys(bed, {x: 0, y: 0, rot: 0}).flatMap(p => p.points);
+    const b = itemPolys(bed, {x: 0, y: 0, rot: 1}).flatMap(p => p.points);
+    const xs = (pts: number[]) => pts.filter((_, i) => i % 2 === 0);
+    expect(Math.min(...xs(b))).toBeCloseTo(-Math.max(...xs(a)));
+    expect(Math.max(...xs(b))).toBeCloseTo(-Math.min(...xs(a)));
+  });
+
+  it('slots move with the mirror', () => {
+    expect(orientPoint([1, 1.6], 1)).toEqual([1.6, 1]);
+    expect(orientPoint([1, 1.6], 0)).toEqual([1, 1.6]);
   });
 });
 

@@ -1,7 +1,7 @@
 // 后宅: an isometric room the player furnishes. The pet owns the data
 // (room.py); this page draws it, edits it and sends the whole layout back after
 // every change. Furniture is free: there is no currency.
-import {Application, Assets, Container, Graphics, Texture} from 'pixi.js';
+import {Application, Assets, Container, Graphics, Sprite, Texture} from 'pixi.js';
 import './style.css';
 import {api} from './api';
 import {
@@ -16,6 +16,8 @@ const WALL_H = 3.2;
 const PANEL_W = 280;
 
 type Mode = {kind: 'none'} | {kind: 'place'; item: string; rot: number; moving?: Placed} | {kind: 'selected'; id: string};
+/** One piece on screen: what to add to the scene, whether a world point hits it, and its top centre. */
+interface ItemView { view: Container; hit(wx: number, wy: number): boolean; top: [number, number] }
 
 async function boot() {
   const app = new Application();
@@ -36,6 +38,17 @@ async function boot() {
   const tex = Object.fromEntries(await Promise.all((['front', 'side', 'back'] as const).map(
     async v => [v, await Assets.load<Texture>({src: ch.sprites[v], parser: 'texture'})]))) as Record<'front' | 'side' | 'back', Texture>;
 
+  // Painted furniture, with its alpha so a click hits what you see. A picture that won't load falls back to boxes.
+  const pics = new Map<string, {tex: Texture; alpha: Uint8Array}>();
+  await Promise.all(cat.items.filter(it => it.sprite).map(async it => {
+    try {
+      const tex = await Assets.load<Texture>({src: it.sprite!.src, parser: 'texture'});
+      pics.set(it.id, {tex, alpha: alphaOf(tex)});
+    } catch (e) {
+      console.warn(`家具图读不了，先画方块：${it.id}`, e);
+    }
+  }));
+
   let layout: Layout = state.layout;
   let saved: Layout = structuredClone(layout);
   let sets: SetState[] = state.sets;
@@ -46,13 +59,15 @@ async function boot() {
   const world = new Container();
   const room = new Graphics();
   const rugs = new Container();
+  const shadows = new Graphics();
   const things = new Container();
   things.sortableChildren = true;
   const overlay = new Graphics();
-  world.addChild(room, rugs, things, overlay);
+  const ghostLayer = new Container();
+  world.addChild(room, rugs, shadows, things, overlay, ghostLayer);
   app.stage.addChild(world);
   const resident = new Resident(tex, ch, cat.room.w / 2, cat.room.d / 2);
-  const itemViews = new Map<string, {g: Graphics; polys: number[][]}>();
+  const itemViews = new Map<string, ItemView>();
 
   function fit() {
     const [lx] = project(0, cat.room.d), [rx] = project(cat.room.w, 0);
@@ -79,27 +94,58 @@ async function boot() {
     room.poly([...P(0, 0), ...P(w, 0), ...P(w, d), ...P(0, d)]).stroke({width: 2, color: 0x000000, alpha: 0.15});
   }
 
-  function drawItem(g: Graphics, item: Item, p: {x: number; y: number; rot: number}, alpha = 1, tint?: number) {
-    const polys = itemPolys(item, p);
-    for (const poly of polys) {
-      g.poly(poly.points).fill({color: tint === undefined ? poly.color : mix(poly.color, tint), alpha});
-      g.poly(poly.points).stroke({width: 1, color: 0x000000, alpha: 0.12 * alpha});
+  function itemView(item: Item, p: {x: number; y: number; rot: number}, alpha = 1, tint?: number): ItemView {
+    const pic = pics.get(item.id);
+    if (!pic) {
+      const g = new Graphics();
+      const polys = itemPolys(item, p);
+      for (const poly of polys) {
+        g.poly(poly.points).fill({color: tint === undefined ? poly.color : mix(poly.color, tint), alpha});
+        g.poly(poly.points).stroke({width: 1, color: 0x000000, alpha: 0.12 * alpha});
+      }
+      const xs = polys.flatMap(q => q.points.filter((_, i) => i % 2 === 0)), ys = polys.flatMap(q => q.points.filter((_, i) => i % 2));
+      return {view: g, hit: (wx, wy) => polys.some(q => pointInPoly(wx, wy, q.points)), top: [(Math.min(...xs) + Math.max(...xs)) / 2, Math.min(...ys)]};
     }
-    return polys.map(q => q.points);
+    // The picture's anchor goes on the footprint's back corner; facing the other way mirrors it about that point.
+    const {anchor: [ax, ay], scale} = item.sprite!;
+    const {width: w, height: h} = pic.tex;
+    const [ox, oy] = project(p.x, p.y), flip = p.rot % 2 ? -1 : 1;
+    const s = new Sprite(pic.tex);
+    s.anchor.set(ax / w, ay / h);
+    s.position.set(ox, oy);
+    s.scale.set(flip / scale, 1 / scale);
+    s.alpha = alpha;
+    if (tint !== undefined) s.tint = tint;
+    return {
+      view: s,
+      hit: (wx, wy) => {
+        const px = Math.floor(ax + (wx - ox) * scale * flip), py = Math.floor(ay + (wy - oy) * scale);
+        return px >= 0 && py >= 0 && px < w && py < h && pic.alpha[py * w + px] > 40;
+      },
+      top: [ox + (w / 2 - ax) * flip / scale, oy - ay / scale],
+    };
+  }
+
+  /** A soft patch of shade under a standing piece, so it sits on the floor. */
+  function drawShadow(item: Item, p: {x: number; y: number; rot: number}) {
+    const [fw, fd] = footprint(item, p.rot), m = 0.08;
+    const x0 = p.x + m, y0 = p.y + m, x1 = p.x + fw - m, y1 = p.y + fd - m;
+    shadows.poly([...project(x0, y0), ...project(x1, y0), ...project(x1, y1), ...project(x0, y1)]).fill({color: 0x2b1d14, alpha: 0.13});
   }
 
   function drawFurniture() {
-    for (const v of itemViews.values()) v.g.destroy();
+    for (const v of itemViews.values()) v.view.destroy();
     itemViews.clear();
+    shadows.clear();
     const selected = mode.kind === 'selected' ? mode.id : mode.kind === 'place' ? mode.moving?.id : undefined;
     for (const p of layout.placed) {
       const item = byId.get(p.item)!;
       if (mode.kind === 'place' && mode.moving?.id === p.id) continue;   // picked up: drawn as the ghost
-      const g = new Graphics();
-      const polys = drawItem(g, item, p, 1, p.id === selected ? 0xfff2a8 : undefined);
-      g.zIndex = depthOf(item, p) * 10;
-      (item.layer === 'rug' ? rugs : things).addChild(g);
-      itemViews.set(p.id, {g, polys});
+      const v = itemView(item, p, 1, p.id === selected ? 0xfff2a8 : undefined);
+      v.view.zIndex = depthOf(item, p) * 10;
+      (item.layer === 'rug' ? rugs : things).addChild(v.view);
+      if (item.layer === 'object') drawShadow(item, p);
+      itemViews.set(p.id, v);
     }
     if (!resident.view.parent) things.addChild(resident.view);
   }
@@ -113,6 +159,7 @@ async function boot() {
 
   function drawOverlay() {
     overlay.clear();
+    for (const c of ghostLayer.removeChildren()) c.destroy();
     const g = ghost();
     if (g) {
       const item = byId.get(g.item)!;
@@ -122,7 +169,7 @@ async function boot() {
         overlay.poly([...project(cx, cy), ...project(cx + 1, cy), ...project(cx + 1, cy + 1), ...project(cx, cy + 1)])
           .fill({color: err ? 0xff5a5a : 0x5ad17a, alpha: 0.45});
       }
-      drawItem(overlay, item, g, 0.7, err ? 0xff8080 : undefined);
+      ghostLayer.addChild(itemView(item, g, 0.7, err ? 0xff8080 : undefined).view);
       ui.hint(err ? `放不下：${err}` : '左键放下 · R 旋转 · 右键 / Esc 取消');
     }
   }
@@ -203,12 +250,12 @@ async function boot() {
   }
 
   function rotate() {
-    if (mode.kind === 'place') { mode = {...mode, rot: (mode.rot + 1) % 4}; redraw(); return; }
+    if (mode.kind === 'place') { mode = {...mode, rot: (mode.rot + 1) % 2}; redraw(); return; }
     if (mode.kind !== 'selected') return;
     const id = mode.id;
     const p = layout.placed.find(x => x.id === id);
     if (!p) return;
-    const turned = {...p, rot: (p.rot + 1) % 4};
+    const turned = {...p, rot: (p.rot + 1) % 2};
     const err = placementError(cat, byId, layout.placed, turned, p.id);
     if (err) { ui.toast(`转不过来：${err}`, true); return; }
     void commit({...layout, placed: layout.placed.map(x => x.id === p.id ? turned : x)});
@@ -234,7 +281,7 @@ async function boot() {
     });
     for (const p of order) {
       const v = itemViews.get(p.id);
-      if (v && v.polys.some(pts => pointInPoly(wx, wy, pts))) return p.id;
+      if (v?.hit(wx, wy)) return p.id;
     }
     return null;
   }
@@ -256,9 +303,7 @@ async function boot() {
     if (mode.kind === 'selected') {
       const v = itemViews.get(mode.id);
       if (v) {
-        const ys = v.polys.flatMap(pts => pts.filter((_, i) => i % 2));
-        const xs = v.polys.flatMap(pts => pts.filter((_, i) => i % 2 === 0));
-        const top = world.toGlobal({x: (Math.min(...xs) + Math.max(...xs)) / 2, y: Math.min(...ys)});
+        const top = world.toGlobal({x: v.top[0], y: v.top[1]});
         ui.showToolbar(top.x, top.y);
       }
     } else ui.hideToolbar();
@@ -298,6 +343,19 @@ async function boot() {
   fit();
   setMode({kind: 'none'});
   resident.say(layout.placed.length ? '欢迎回来～' : '空荡荡的……摆点家具吧！', 3.5);
+}
+
+/** The alpha channel of a loaded picture, one byte per pixel, for hit testing. */
+function alphaOf(tex: Texture): Uint8Array {
+  const {width: w, height: h} = tex;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d', {willReadFrequently: true})!;
+  g.drawImage(tex.source.resource as CanvasImageSource, 0, 0, w, h);
+  const rgba = g.getImageData(0, 0, w, h).data, out = new Uint8Array(w * h);
+  for (let i = 0; i < out.length; i++) out[i] = rgba[i * 4 + 3];
+  return out;
 }
 
 function mix(a: number, b: number): number {

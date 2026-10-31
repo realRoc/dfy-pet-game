@@ -9,5 +9,5 @@ export default defineConfig({
   base: './',
   plugins: [viteSingleFile()],
   build: {assetsInlineLimit: 100_000_000},
-  server: api ? {proxy: {'/api': {target: api, changeOrigin: true}, '/character': {target: api, changeOrigin: true}}} : {},
+  server: api ? {proxy: Object.fromEntries(['/api', '/character', '/furniture'].map(p => [p, {target: api, changeOrigin: true}]))} : {},
 });

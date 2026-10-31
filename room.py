@@ -1,8 +1,10 @@
 """后宅：一个等距视角的小房间，摆家具、凑套装。
 
 几块：
-- 家具目录：content/room/catalog.json（家具、套装、姿势库、墙纸、地板）。家具都是网页里按 boxes 用代码画的原创图，
-  可以商用；家具不带角色动画，只声明「姿势槽位」（slots），角色走过去按姿势库里的标准姿势待着。
+- 家具目录：content/room/catalog.json（家具、套装、姿势库、墙纸、地板）。家具有手绘图（sprite，图在 content/room/furniture/，
+  用 tools/make_furniture_sprites.py 生成）就贴图，没有就按 boxes 用代码画；boxes 同时管遮挡和角色躺的高度。
+  家具不带角色动画，只声明「姿势槽位」（slots），角色走过去按姿势库里的标准姿势待着。
+- 朝向：和碧蓝航线后宅一样只有两个，rot 0 是画的样子，rot 1 是左右镜像（一张图两个朝向），占地 宽×深 变成 深×宽。
 - 布局：摆了哪些家具、在哪、朝哪，选了哪种墙纸地板，存在 DATA_DIR/room.json。规则（不出界、不重叠）在这里校验，
   网页那边只是预判，以这里为准。
 - 套装：套装里每件都摆上了就算集齐，网页显示进度、集齐时提示。
@@ -12,6 +14,7 @@
 """
 import json
 import os
+import re
 import secrets
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -21,6 +24,8 @@ from character import CHAR
 _HERE = os.path.dirname(os.path.abspath(__file__))
 CATALOG_PATH = os.path.join(_HERE, "content", "room", "catalog.json")
 PAGE_PATH = os.path.join(_HERE, "content", "room", "index.html")
+FURNITURE_DIR = os.path.join(_HERE, "content", "room", "furniture")
+SPRITE_NAME = re.compile(r"^[a-z0-9_]+\.png$")
 LAYOUT_VERSION = 1
 MAX_PLACED = 120
 MAX_BODY = 64 * 1024
@@ -60,6 +65,12 @@ def validate_catalog(cat):
             errors.append(f"{iid}: 缺 name")
         if not it.get("boxes"):
             errors.append(f"{iid}: 没有 boxes，画不出来")
+        sp = it.get("sprite")
+        if sp is not None:
+            if not SPRITE_NAME.match(str(sp.get("src"))) or not os.path.isfile(os.path.join(FURNITURE_DIR, sp["src"])):
+                errors.append(f"{iid}: 手绘图 {sp.get('src')} 不在 content/room/furniture/ 里")
+            if len(sp.get("anchor", ())) != 2 or not sp.get("scale", 0) > 0:
+                errors.append(f"{iid}: 手绘图要有 anchor [x, y] 和 scale")
         for b in it.get("boxes", []):
             (bx, by, _), (bw, bd, bh) = b["at"], b["size"]
             if bx < 0 or by < 0 or bx + bw > sx + 1e-9 or by + bd > sy + 1e-9 or min(bw, bd, bh) <= 0:
@@ -80,7 +91,7 @@ def validate_catalog(cat):
 
 
 def footprint(item, rot):
-    """转了 rot 个 90° 之后占几格 (宽, 深)。"""
+    """朝向 rot 时占几格 (宽, 深)：镜像过来宽深对调。"""
     sx, sy = item["size"]
     return (sy, sx) if rot % 2 else (sx, sy)
 
@@ -123,6 +134,7 @@ def validate_layout(cat, data):
         x, y, rot = p.get("x"), p.get("y"), p.get("rot", 0)
         if not all(isinstance(v, int) and not isinstance(v, bool) for v in (x, y, rot)) or rot not in (0, 1, 2, 3):
             raise LayoutError(f"{item['name']}: 位置和朝向要是整数（rot 0~3）")
+        rot %= 2   # 以前是四个 90° 朝向，旧存档里的 2、3 按单双数算
         fw, fd = footprint(item, rot)
         if x < 0 or y < 0 or x + fw > w or y + fd > d:
             raise LayoutError(f"{item['name']} 出界了")
@@ -197,7 +209,10 @@ class RoomAPI:
 
     def catalog(self):
         cat = self.store.cat
-        return {k: cat[k] for k in ("format", "license", "room", "poses", "wallpapers", "floors", "sets", "items")}
+        out = {k: cat[k] for k in ("format", "license", "room", "poses", "wallpapers", "floors", "sets")}
+        out["items"] = [dict(it, sprite=dict(it["sprite"], src=f"/furniture/{it['sprite']['src']}")) if it.get("sprite") else it
+                        for it in cat["items"]]
+        return out
 
     def state(self):
         c = self.char
@@ -302,6 +317,13 @@ def _make_handler(server):
                 except OSError:
                     return self._send(404, "后宅网页还没打包：在 room/ 里跑 npm run release".encode(),
                                       "text/plain; charset=utf-8")
+            name = path[len("/furniture/"):] if path.startswith("/furniture/") else None
+            if name and SPRITE_NAME.match(name):
+                try:
+                    with open(os.path.join(FURNITURE_DIR, name), "rb") as f:
+                        return self._send(200, f.read(), "image/png")
+                except OSError:
+                    pass
             view = path[len("/character/"):-len(".png")] if path.startswith("/character/") and path.endswith(".png") else None
             if view in ("front", "side", "back"):
                 try:
