@@ -3,7 +3,7 @@
   "license": {
     "spdx": "MIT",
     "commercial": true,
-    "source": "本项目原创：家具都是 room/ 网页里按下面的 boxes（等距长方体）用代码画的，没有用任何外部素材或角色形象"
+    "source": "本项目原创：没有 sprite 的家具是 room/ 网页里按 boxes（等距长方体）用代码画的；有 sprite 的家具图（furniture/*.png）是 ChatGPT 图片生成（经 Codex CLI，tools/make_furniture_sprites.py）照着 boxes 白模和本项目写的描述画的原创图。没有用任何外部素材或角色形象"
   },
   "room": {"w": 8, "d": 8},
   "poses": {
@@ -39,7 +39,8 @@
         {"at": [0.25, 0.2, 0.55], "size": [1.5, 0.6, 0.18], "color": "#ffffff"},
         {"at": [0, 0, 0.35], "size": [2, 0.15, 0.9], "color": "#e7a9a9"}
       ],
-      "slots": [{"pose": "sleep", "at": [1, 1.6]}, {"pose": "lie", "at": [1, 1.6]}]
+      "slots": [{"pose": "sleep", "at": [1, 1.6]}, {"pose": "lie", "at": [1, 1.6]}],
+      "sprite": {"src": "shell_bed.png", "anchor": [290.4, 183.0], "scale": 3.0}
     },
     {
       "id": "driftwood_table", "name": "浮木小桌", "set": "seaside", "size": [2, 2], "layer": "object",
@@ -51,7 +52,8 @@
         {"at": [0.05, 0.05, 0.5], "size": [1.9, 1.9, 0.12], "color": "#b9916a"},
         {"at": [0.8, 0.8, 0.62], "size": [0.4, 0.4, 0.3], "color": "#7fc4e0"}
       ],
-      "slots": [{"pose": "drink", "at": [1, 2.3]}]
+      "slots": [{"pose": "drink", "at": [1, 2.3]}],
+      "sprite": {"src": "driftwood_table.png", "anchor": [184.3, 78.3], "scale": 3.0}
     },
     {
       "id": "coral_stool", "name": "珊瑚凳", "set": "seaside", "size": [1, 1], "layer": "object",
@@ -59,7 +61,8 @@
         {"at": [0.3, 0.3, 0], "size": [0.4, 0.4, 0.3], "color": "#ef8a76"},
         {"at": [0.15, 0.15, 0.3], "size": [0.7, 0.7, 0.12], "color": "#f4a08f"}
       ],
-      "slots": [{"pose": "sit", "at": [0.5, 0.5], "z": 0.42}]
+      "slots": [{"pose": "sit", "at": [0.5, 0.5], "z": 0.42}],
+      "sprite": {"src": "coral_stool.png", "anchor": [68.3, 79.1], "scale": 3.0}
     },
     {
       "id": "lifebuoy_rug", "name": "救生圈地毯", "set": "seaside", "size": [2, 2], "layer": "rug",
@@ -68,7 +71,8 @@
         {"at": [0, 0, 0.03], "size": [1, 1, 0.01], "color": "#e95b5b"},
         {"at": [1, 1, 0.03], "size": [1, 1, 0.01], "color": "#e95b5b"},
         {"at": [0.7, 0.7, 0.04], "size": [0.6, 0.6, 0.01], "color": "#c9a87c"}
-      ]
+      ],
+      "sprite": {"src": "lifebuoy_rug.png", "anchor": [193.9, 32.5], "scale": 3.0}
     },
     {
       "id": "lighthouse_lamp", "name": "灯塔落地灯", "set": "seaside", "size": [1, 1], "layer": "object",
@@ -78,7 +82,8 @@
         {"at": [0.3, 0.3, 0.8], "size": [0.4, 0.4, 0.4], "color": "#ffffff"},
         {"at": [0.28, 0.28, 1.2], "size": [0.44, 0.44, 0.25], "color": "#ffe27a"},
         {"at": [0.25, 0.25, 1.45], "size": [0.5, 0.5, 0.1], "color": "#e95b5b"}
-      ]
+      ],
+      "sprite": {"src": "lighthouse_lamp.png", "anchor": [49.4, 204.9], "scale": 3.0}
     },
     {
       "id": "study_desk", "name": "书桌", "set": "study", "size": [2, 1], "layer": "object",
@@ -89,7 +94,8 @@
         {"at": [1.3, 0.15, 0.7], "size": [0.4, 0.3, 0.35], "color": "#fff1b8"},
         {"at": [0.6, 0.2, 0.7], "size": [0.5, 0.35, 0.06], "color": "#5d8fc9"}
       ],
-      "slots": [{"pose": "read", "at": [1, 1.5]}]
+      "slots": [{"pose": "read", "at": [1, 1.5]}],
+      "sprite": {"src": "study_desk.png", "anchor": [97.5, 77.2], "scale": 3.0}
     },
     {
       "id": "bookshelf", "name": "书架", "set": "study", "size": [2, 1], "layer": "object",
@@ -101,7 +107,8 @@
         {"at": [0.1, 0.45, 0.8], "size": [0.8, 0.16, 0.42], "color": "#f0ad4e"},
         {"at": [1, 0.45, 0.8], "size": [0.85, 0.16, 0.45], "color": "#9b72cf"},
         {"at": [0.1, 0.45, 1.4], "size": [1.75, 0.16, 0.38], "color": "#e6e1d6"}
-      ]
+      ],
+      "sprite": {"src": "bookshelf.png", "anchor": [59.4, 202.7], "scale": 3.0}
     },
     {
       "id": "swivel_chair", "name": "转椅", "set": "study", "size": [1, 1], "layer": "object",
@@ -110,7 +117,8 @@
         {"at": [0.1, 0.1, 0.4], "size": [0.8, 0.8, 0.12], "color": "#3f6fb0"},
         {"at": [0.1, 0.1, 0.52], "size": [0.8, 0.12, 0.6], "color": "#3f6fb0"}
       ],
-      "slots": [{"pose": "sit", "at": [0.5, 0.55], "z": 0.52}]
+      "slots": [{"pose": "sit", "at": [0.5, 0.55], "z": 0.52}],
+      "sprite": {"src": "swivel_chair.png", "anchor": [77.9, 141.3], "scale": 3.0}
     },
     {
       "id": "beanbag", "name": "懒人沙发", "set": "study", "size": [1, 1], "layer": "object",
@@ -118,12 +126,14 @@
         {"at": [0.05, 0.05, 0], "size": [0.9, 0.9, 0.35], "color": "#f2b84b"},
         {"at": [0.05, 0.05, 0.35], "size": [0.9, 0.3, 0.3], "color": "#e8a933"}
       ],
-      "slots": [{"pose": "sit", "at": [0.5, 0.6], "z": 0.3}, {"pose": "read", "at": [0.5, 0.6], "z": 0.3}]
+      "slots": [{"pose": "sit", "at": [0.5, 0.6], "z": 0.3}, {"pose": "read", "at": [0.5, 0.6], "z": 0.3}],
+      "sprite": {"src": "beanbag.png", "anchor": [87.2, 61.1], "scale": 3.0}
     },
     {
       "id": "yoga_mat", "name": "瑜伽垫", "set": "gym", "size": [1, 2], "layer": "rug",
       "boxes": [{"at": [0.1, 0.05, 0], "size": [0.8, 1.9, 0.04], "color": "#8fd1b5"}],
-      "slots": [{"pose": "exercise", "at": [0.5, 1]}, {"pose": "lie", "at": [0.5, 1]}]
+      "slots": [{"pose": "exercise", "at": [0.5, 1]}, {"pose": "lie", "at": [0.5, 1]}],
+      "sprite": {"src": "yoga_mat.png", "anchor": [178.9, 11.0], "scale": 3.0}
     },
     {
       "id": "dumbbell_rack", "name": "哑铃架", "set": "gym", "size": [1, 1], "layer": "object",
@@ -132,7 +142,8 @@
         {"at": [0.15, 0.25, 0.5], "size": [0.2, 0.5, 0.15], "color": "#2f343c"},
         {"at": [0.65, 0.25, 0.5], "size": [0.2, 0.5, 0.15], "color": "#2f343c"}
       ],
-      "slots": [{"pose": "exercise", "at": [0.5, 1.3]}]
+      "slots": [{"pose": "exercise", "at": [0.5, 1.3]}],
+      "sprite": {"src": "dumbbell_rack.png", "anchor": [58.4, 44.3], "scale": 3.0}
     },
     {
       "id": "water_cooler", "name": "饮水机", "set": "gym", "size": [1, 1], "layer": "object",
@@ -141,7 +152,8 @@
         {"at": [0.25, 0.25, 0.8], "size": [0.5, 0.5, 0.5], "color": "#8ecdf0"},
         {"at": [0.35, 0.78, 0.45], "size": [0.3, 0.05, 0.12], "color": "#3b82c4"}
       ],
-      "slots": [{"pose": "drink", "at": [0.5, 1.3]}]
+      "slots": [{"pose": "drink", "at": [0.5, 1.3]}],
+      "sprite": {"src": "water_cooler.png", "anchor": [58.8, 146.6], "scale": 3.0}
     },
     {
       "id": "pothos", "name": "绿萝盆栽", "size": [1, 1], "layer": "object",
@@ -149,11 +161,13 @@
         {"at": [0.3, 0.3, 0], "size": [0.4, 0.4, 0.35], "color": "#c46d4a"},
         {"at": [0.2, 0.2, 0.35], "size": [0.6, 0.6, 0.35], "color": "#4fa45b"},
         {"at": [0.3, 0.3, 0.7], "size": [0.4, 0.4, 0.25], "color": "#62b86d"}
-      ]
+      ],
+      "sprite": {"src": "pothos.png", "anchor": [58.6, 89.7], "scale": 3.0}
     },
     {
       "id": "round_rug", "name": "米色地毯", "size": [3, 2], "layer": "rug",
-      "boxes": [{"at": [0, 0, 0], "size": [3, 2, 0.03], "color": "#e9dcc3"}, {"at": [0.3, 0.3, 0.03], "size": [2.4, 1.4, 0.01], "color": "#d8c4a0"}]
+      "boxes": [{"at": [0, 0, 0], "size": [3, 2, 0.03], "color": "#e9dcc3"}, {"at": [0.3, 0.3, 0.03], "size": [2.4, 1.4, 0.01], "color": "#d8c4a0"}],
+      "sprite": {"src": "round_rug.png", "anchor": [194.5, -6.3], "scale": 3.0}
     }
   ]
 }

@@ -34,10 +34,19 @@ class CatalogTest(unittest.TestCase):
         self.assertTrue(2 <= len(self.cat["sets"]) <= 3)
 
     def test_catalog_is_original_and_commercial(self):
-        """家具是代码画的原创图，商业版能直接带。"""
+        """家具是原创图（代码画的方块，或按方块白模生成的手绘图），商业版能直接带。"""
         self.assertTrue(self.cat["license"]["commercial"])
         for it in self.cat["items"]:
-            self.assertNotIn("image", it, it["id"])   # 只有 boxes，没有外部图片
+            self.assertNotIn("image", it, it["id"])   # 图只能是 content/room/furniture/ 里的 sprite，没有外部图片
+
+    def test_validate_catalog_checks_sprites(self):
+        bad = json.loads(json.dumps({k: v for k, v in self.cat.items() if k != "by_id"}))
+        bad["items"][0]["sprite"] = {"src": "../room.py", "anchor": [0, 0], "scale": 3}
+        bad["items"][1]["sprite"] = {"src": "nope.png", "anchor": [0], "scale": 0}
+        errors = "\n".join(room.validate_catalog(bad))
+        self.assertIn("../room.py", errors)
+        self.assertIn("nope.png", errors)
+        self.assertIn("anchor", errors)
 
     def test_slots_only_use_pose_library(self):
         poses = set(self.cat["poses"])
@@ -80,6 +89,11 @@ class LayoutTest(unittest.TestCase):
         with self.assertRaisesRegex(room.LayoutError, "出界"):
             room.validate_layout(self.cat, self.layout(place("a", "shell_bed", 6, 0, rot=1)))
         self.assertEqual(room.footprint(self.cat["by_id"]["shell_bed"], 3), (3, 2))
+
+    def test_old_quarter_turns_become_two_facings(self):
+        # 以前有四个 90° 朝向，现在只有原样 / 镜像两个：旧存档的 2、3 按单双数算
+        out = room.validate_layout(self.cat, self.layout(place("a", "shell_bed", 0, 0, rot=2), place("b", "pothos", 5, 5, rot=3)))
+        self.assertEqual([p["rot"] for p in out["placed"]], [0, 1])
 
     def test_overlap_same_layer(self):
         with self.assertRaisesRegex(room.LayoutError, "叠在一起"):
@@ -229,12 +243,21 @@ class ServerTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(body.startswith(b"\x89PNG"))
         self.assertEqual(self.request("GET", "/character/../../etc.png", token=False)[0], 404)
+        status, body = self.request("GET", "/furniture/shell_bed.png", token=False)
+        self.assertEqual(status, 200)
+        self.assertTrue(body.startswith(b"\x89PNG"))
+        self.assertEqual(self.request("GET", "/furniture/../catalog.json", token=False)[0], 404)
+        self.assertEqual(self.request("GET", "/furniture/nope.png", token=False)[0], 404)
 
     def test_catalog_and_state(self):
         status, cat = self.request("GET", "/api/catalog")
         self.assertEqual(status, 200)
         self.assertEqual(len(cat["items"]), len(self.store.cat["items"]))
         self.assertNotIn("by_id", cat)
+        sprites = [it["sprite"]["src"] for it in cat["items"] if it.get("sprite")]
+        self.assertTrue(sprites)
+        self.assertTrue(all(src.startswith("/furniture/") for src in sprites))
+        self.assertFalse(self.store.cat["by_id"]["shell_bed"]["sprite"]["src"].startswith("/"))   # 没改到目录本身
         status, st = self.request("GET", "/api/state")
         self.assertEqual(status, 200)
         self.assertEqual(st["layout"]["placed"], [])

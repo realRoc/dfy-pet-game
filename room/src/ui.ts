@@ -21,7 +21,7 @@ export class Ui {
   private previews = new Map<string, string>();
 
   constructor(private cat: Catalog, private act: Actions) {
-    for (const it of cat.items) this.previews.set(it.id, preview(it));
+    for (const it of cat.items) this.previews.set(it.id, it.sprite ? it.sprite.src : preview(it));
     $('tabs').addEventListener('click', e => {
       const t = (e.target as HTMLElement).dataset.tab as typeof this.tab | undefined;
       if (t) { this.tab = t; this.renderList(this.last!); }

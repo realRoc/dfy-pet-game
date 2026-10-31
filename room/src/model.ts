@@ -5,9 +5,12 @@ export type Vec3 = [number, number, number];
 
 export interface Box { at: Vec3; size: Vec3; color: string }
 export interface Slot { pose: string; at: [number, number]; z?: number }
+/** A painted picture of the piece facing rot 0. `anchor` is the pixel where the footprint's back corner
+ *  (grid 0, 0, 0) sits; `scale` is picture pixels per screen unit. rot 1 shows it mirrored. */
+export interface Sprite { src: string; anchor: [number, number]; scale: number }
 export interface Item {
   id: string; name: string; set?: string; size: [number, number];
-  layer: 'object' | 'rug'; boxes: Box[]; slots?: Slot[];
+  layer: 'object' | 'rug'; boxes: Box[]; slots?: Slot[]; sprite?: Sprite;
 }
 export interface Surface { id: string; name: string; color: string; trim?: string; alt?: string }
 export interface Catalog {
@@ -40,32 +43,25 @@ export function unproject(sx: number, sy: number): [number, number] {
   return [(a + b) / 2, (b - a) / 2];
 }
 
-// ---------- rotation ----------
-// rot counts quarter turns clockwise (seen from above). Item data is authored at rot 0.
+// ---------- facing ----------
+// Like the dorm in 碧蓝航线, a piece faces one of two ways: rot 0 as authored, rot 1 mirrored left-right, so
+// one painting covers both. Mirroring the screen swaps grid x and y, which turns a w×d footprint into d×w.
+// Older layouts may hold rot 2 or 3 (they were quarter turns); only odd or even matters.
 
 export function footprint(item: Item, rot: number): [number, number] {
   const [w, d] = item.size;
   return rot % 2 ? [d, w] : [w, d];
 }
 
-/** A box inside the footprint after `rot` quarter turns. */
-export function rotateBox(box: Box, size: [number, number], rot: number): Box {
-  let [x, y, z] = box.at, [w, d, h] = box.size, [fw, fd] = size;
-  for (let i = 0; i < ((rot % 4) + 4) % 4; i++) {
-    [x, y, w, d] = [fd - y - d, x, d, w];
-    [fw, fd] = [fd, fw];
-  }
-  return {at: [x, y, z], size: [w, d, h], color: box.color};
+/** A box of the item as it stands facing `rot`. */
+export function orientBox(box: Box, rot: number): Box {
+  const [x, y, z] = box.at, [w, d, h] = box.size;
+  return rot % 2 ? {at: [y, x, z], size: [d, w, h], color: box.color} : {at: [x, y, z], size: [w, d, h], color: box.color};
 }
 
-/** A point inside (or next to) the footprint after `rot` quarter turns. */
-export function rotatePoint(p: [number, number], size: [number, number], rot: number): [number, number] {
-  let [x, y] = p, [fw, fd] = size;
-  for (let i = 0; i < ((rot % 4) + 4) % 4; i++) {
-    [x, y] = [fd - y, x];
-    [fw, fd] = [fd, fw];
-  }
-  return [x, y];
+/** A point of the item (a slot) as it stands facing `rot`. */
+export function orientPoint(p: [number, number], rot: number): [number, number] {
+  return rot % 2 ? [p[1], p[0]] : [p[0], p[1]];
 }
 
 // ---------- placement rules (mirror validate_layout in room.py, which has the final say) ----------
@@ -114,7 +110,7 @@ export function shade(color: number, k: number): number {
 
 /** Screen polygons for one placed item, back to front: per box its +y face, +x face, then top. */
 export function itemPolys(item: Item, p: {x: number; y: number; rot: number}): Poly[] {
-  const boxes = item.boxes.map(b => rotateBox(b, item.size, p.rot));
+  const boxes = item.boxes.map(b => orientBox(b, p.rot));
   boxes.sort((a, b) => (a.at[0] + a.size[0] / 2 + a.at[1] + a.size[1] / 2) - (b.at[0] + b.size[0] / 2 + b.at[1] + b.size[1] / 2)
     || a.at[2] - b.at[2]);
   const out: Poly[] = [];
@@ -148,7 +144,7 @@ export function pointInPoly(px: number, py: number, pts: number[]): boolean {
 /** Where the character stands for each slot of a placed item, in grid coordinates. */
 export function slotsOf(item: Item, p: Placed, room: {w: number; d: number}): {pose: string; x: number; y: number; z: number}[] {
   return (item.slots ?? []).map(s => {
-    const [sx, sy] = rotatePoint(s.at, item.size, p.rot);
+    const [sx, sy] = orientPoint(s.at, p.rot);
     return {
       pose: s.pose,
       x: Math.min(room.w - 0.3, Math.max(0.3, p.x + sx)),
