@@ -26,7 +26,7 @@ from PySide6.QtWidgets import (QApplication, QWidget, QMenu, QSystemTrayIcon, QM
                                QInputDialog, QLineEdit, QHBoxLayout, QVBoxLayout, QPushButton,
                                QFrame, QDialog, QToolButton)
 
-from common import (APP_DIR, APP_NAME, DATA_DIR, ICON_PATH, TOWER_HTML, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
+from common import (APP_DIR, APP_NAME, DATA_DIR, ICON_PATH, IS_MAC, IS_WIN, UI_FONT, SPRITE_SRC_H,
                     emoji_font, float_flags, load_sprites, pix_size)
 from expressions import EXPRESSIONS, ExpressionPlayer
 import clips
@@ -149,13 +149,13 @@ class ChatDialog(QDialog):
 
 
 class FunctionPanel(QFrame):
-    """单击弹出的功能列表：聊天 / 爬塔 / 跟练 / 后宅（/ 连接 IM）"""
+    """单击弹出的功能列表：聊天 / 跟练 / 后宅（/ 连接 IM）"""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowFlags(float_flags())
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-        buttons = [("🗨️", "聊天", self._on_chat_clicked), ("🗼", "爬塔", self._on_tower_clicked),
-                   ("🏋️", "跟练", self._on_workout_clicked), ("🏠", "后宅", self._on_room_clicked)]
+        buttons = [("🗨️", "聊天", self._on_chat_clicked), ("🏋️", "跟练", self._on_workout_clicked),
+                   ("🏠", "后宅", self._on_room_clicked)]
         if parent is not None and getattr(parent.app, "im", None):
             buttons.append(("🔗", "连接 IM", lambda: (self.hide(), parent.app.im.open_dialog())))
         width = 16 + 52 * len(buttons) + 2 * (len(buttons) - 1)
@@ -196,11 +196,6 @@ class FunctionPanel(QFrame):
         self.hide()
         if self.parent():
             self.parent()._show_chat_dialog()
-
-    def _on_tower_clicked(self):
-        self.hide()
-        if self.parent():
-            self.parent().open_tower()
 
     def _on_workout_clicked(self):
         self.hide()
@@ -1365,18 +1360,6 @@ class PetWindow(QWidget):
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def open_tower(self):
-        """在系统浏览器里打开爬塔。它是独立的网页游戏，和桌宠不共用存档。"""
-        if not os.path.isfile(TOWER_HTML):
-            self.say("爬塔还没打包，先在 tower/ 里 npm run release")
-            return
-        # 交不给系统浏览器时 openUrl 返回 False（比如没有关联 .html 的程序），这时别报“去爬塔啦”
-        if QDesktopServices.openUrl(QUrl.fromLocalFile(TOWER_HTML)):
-            self.say("去爬塔啦！")
-        else:
-            print("爬塔打开失败:", TOWER_HTML)
-            self.say("浏览器没打开，手动打开 content/tower/index.html")
-
     def open_room(self):
         """在系统浏览器里打开后宅。数据在桌宠这边（room.json），网页通过本机的小服务读写。"""
         try:
@@ -1400,7 +1383,6 @@ class PetWindow(QWidget):
         return self._fill_menu(QMenu(self))
 
     def _fill_menu(self, m):
-        m.addAction("🗼 爬塔", self.open_tower)
         m.addAction("🏠 后宅", self.open_room)
         self._add_workout_menu(m)
         self._add_water_menu(m)
