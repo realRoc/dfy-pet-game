@@ -9,6 +9,7 @@ import {
 } from './model';
 import type {Catalog, Item, Layout, Placed, SetState, State} from './model';
 import {Resident} from './resident';
+import {saveQueue} from './saver';
 import type {Spot} from './resident';
 import {Ui} from './ui';
 
@@ -50,7 +51,6 @@ async function boot() {
   }));
 
   let layout: Layout = state.layout;
-  let saved: Layout = structuredClone(layout);
   let sets: SetState[] = state.sets;
   let mode: Mode = {kind: 'none'};
   let hover: [number, number] | null = null;
@@ -198,25 +198,13 @@ async function boot() {
   }
 
   // ---------- editing ----------
-  // Saves go one at a time, each sending the newest layout, so a slow response can't
-  // overwrite a later edit and the pet never ends up with an older layout than the page.
-  let saving = Promise.resolve();
-  let edits = 0;
-  function commit(next: Layout) {
-    layout = next;
-    const mine = ++edits;
-    redraw();
-    saving = saving.then(() => save(mine));
-  }
-
-  async function save(mine: number) {
-    if (mine !== edits) return;   // a newer edit is queued and will send this one's changes too
-    const before = sets;
-    try {
-      const r = await api.putLayout(layout);
-      saved = structuredClone(r.layout);
+  const queueSave = saveQueue({
+    get: () => layout,
+    set: (next: Layout) => { layout = next; },
+    put: api.putLayout,
+    saved: r => {
+      const before = sets;
       sets = r.sets;
-      if (mine === edits) layout = r.layout;
       const news: string[] = [];
       for (const s of sets) {
         if (s.complete && !before.find(x => x.id === s.id)?.complete) {
@@ -225,10 +213,15 @@ async function boot() {
         }
       }
       if (news.length) ui.toast(news.join('　'));
-    } catch (e) {
-      layout = structuredClone(saved);
-      ui.toast(`没存上：${(e as Error).message}`, true);
-    }
+      redraw();
+    },
+    failed: e => {
+      ui.toast(`没存上：${e.message}`, true);
+      redraw();
+    },
+  });
+  function commit(next: Layout) {
+    void queueSave(next);
     redraw();
   }
 
