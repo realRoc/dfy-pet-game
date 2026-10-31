@@ -562,7 +562,7 @@ class AppTest(unittest.TestCase):
         self.assertIn("🔗 连接 IM", self.menu_texts(app))
         from PySide6.QtWidgets import QPushButton
         tips = [b.toolTip() for b in app.pet.function_panel.findChildren(QPushButton)]
-        self.assertEqual(tips, ["聊天", "爬塔", "跟练", "后宅", "连接 IM"])
+        self.assertEqual(tips, ["聊天", "跟练", "后宅", "连接 IM"])
         self.assertEqual(set(app.im.dialog.sections), {"qq", "discord"})
         app.im.dialog.close()
 

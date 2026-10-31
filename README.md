@@ -1,16 +1,6 @@
 # 大肥鱼 🐋
 
-给 DeepSeek 二创形象「鲸鱼娘·大肥鱼」做的**桌面宠物**，外加一个独立的网页爬塔游戏。
-
-- **桌宠**（仓库根目录，Python + PySide6）：在桌面上散步、互动、做表情、播动作动画，还能带你健身跟练
-- **爬塔**（[`tower/`](tower/README.md)，网页游戏）：仿《杀戮尖塔》的像素卡牌 roguelike，15 层地图选路打到关底 Boss。桌宠单击面板里的 🗼 或右键「🗼 爬塔」直接在浏览器里打开
-
-### 爬塔宣传视频
-
-[![大肥鱼爬塔宣传视频：点击播放](docs/tower-promo.jpg)](docs/tower-promo.mp4)
-
-72 秒，1080p（[`docs/tower-promo.mp4`](docs/tower-promo.mp4)）：选路地图 → 鲸尾连击 → 战斗奖励 → 问号事件 → 错峰小卖部 → 铁盆精英 → 宝箱 → Bug 房里的波峰波谷 → 打盹点 → 关底黑鲸，攒满「已思考 10 秒」，最后放出巨鲸破浪。
-画面是游戏实机逐帧录的，牌序和敌人血量事先排好；配乐用 ACE-Step 生成，音效是游戏自己的。
+给 DeepSeek 二创形象「鲸鱼娘·大肥鱼」做的**桌面宠物**（Python + PySide6）：在桌面上散步、互动、做表情、播动作动画，还能带你健身跟练、催你喝水、在后宅里布置房间。
 
 ### 跟练宣传视频
 
@@ -32,20 +22,21 @@
 台词事先指定，桌面上的代码窗口、鼠标和右键菜单是画上去的。配乐用 ACE-Step 生成，碎屏那一下的提示音是桌宠自己的。
 
 之前的飞行棋已经移除，最后一个完整版本留在标签 `flying-chess-archive` 上（`git checkout flying-chess-archive`）。
+爬塔（仿《杀戮尖塔》的像素卡牌 roguelike）也已经移除，最后一个完整版本在标签 `tower-archive` 上（`git checkout tower-archive`）。
 
 ## 桌宠
 
 保留了 [dafeiyu-pet](https://github.com/1190fasheqi/dafeiyu-pet) 的全部功能：
 
 - **三视图行走**：自由散步 / 跟随鼠标 / 原地待着；左右走用侧面（自动镜像），向上背面、向下正面
-- **互动**：拖拽（会侧身朝拖动方向）；单击蹦一下、回嘴，并弹出功能面板（🗨️ 聊天、🗼 爬塔、🏋️ 跟练、🏠 后宅）；双击喂食（小鱼干 / 蛋糕 / 棒棒糖 / 团子 / 钻石）
+- **互动**：拖拽（会侧身朝拖动方向）；单击蹦一下、回嘴，并弹出功能面板（🗨️ 聊天、🏋️ 跟练、🏠 后宅）；双击喂食（小鱼干 / 蛋糕 / 棒棒糖 / 团子 / 钻石）
 - **台词**：日常台词、互动回嘴、思维链心声（灰色斜体括号气泡）
 - **AI 对话**：调用 DeepSeek API，Key 在右键「设置 Key」里填，存在本地 `config.json`
 - **去 QQ / Discord 里聊天**：右键「🔗 连接 IM」（或单击面板的 🔗），填上你自己建的机器人的密钥，她就用自己的身份回大家的话，
   聊到开心时桌面上的她也会冒泡。只能聊天，碰不到你的电脑；有白名单和回复上限。怎么建机器人见 [`docs/im-bots.md`](docs/im-bots.md)
 - **天气**：右键「查看天气」，城市在「设置城市」里改
 - **系统监控**：CPU、内存过高时冒泡提醒（Windows 有 NVIDIA 显卡时还会看显卡温度）
-- **右键菜单 / 托盘**（macOS 是菜单栏图标）：🗼 爬塔、模式、大小、显示 / 隐藏、回到屏幕内、鼠标穿透、窗口置顶、开机自启、退出
+- **右键菜单 / 托盘**（macOS 是菜单栏图标）：模式、大小、显示 / 隐藏、回到屏幕内、鼠标穿透、窗口置顶、开机自启、退出
 
 新增：
 
@@ -187,23 +178,6 @@ tgz 的路径别太长（放在临时目录深处时 pnpm 会报 `ENAMETOOLONG`�
   不设它的话 QQ 会话用 dsh 的标准模式，带 bash 和文件读写，审批按钮还会发给 QQ 里聊天的人，等于让陌生人在你电脑上跑命令。
 - **dsh 怎么指挥桌宠**：插件把桌宠当子进程起（`DFY_CONTROL=stdin`），往它的 stdin 一行写一条 JSON，格式见 [`control.py`](control.py)；管道断了桌宠就退出。
 
-### 爬塔
-
-从桌宠点 🗼（单击面板或右键菜单）就能玩，不需要装 node：桌宠会用系统浏览器打开仓库里打包好的 `content/tower/index.html`。
-爬塔和桌宠只共用这个入口，存档、货币（塔里是 Token）都是分开的。
-
-改爬塔的代码要装 node：
-
-```bash
-cd tower
-npm install
-npm run dev        # 开发，浏览器打开 http://localhost:5173
-npm test           # 规则测试
-npm run release    # 重新打包并更新 content/tower/，改完代码记得跑一次再提交
-```
-
-`content/tower/SOURCE_HASH` 记着打包时的源码哈希，`python -m unittest discover -s tests` 会检查它和 `tower/` 的源码对得上。详见 [tower/README.md](tower/README.md)。
-
 ## 文件
 
 | 文件 | 说明 |
@@ -225,8 +199,6 @@ npm run release    # 重新打包并更新 content/tower/，改完代码记得�
 | `tools/import_clips.py` | 从 dsh-pet 的 `assets/webm` 导入动作动画，算人物外框、写进当前角色包的 `clips/` |
 | `common.py` | 路径、平台差异（字体、窗口标志）、配置、精灵加载 |
 | `启动大肥鱼.command` | macOS 双击启动脚本 |
-| `tower/` | 爬塔（Vite + TypeScript），和桌宠不共用代码，见 [tower/README.md](tower/README.md) |
-| `content/tower/` | 爬塔打包好的单文件网页（`npm run release` 生成，提交进仓库），桌宠的 🗼 入口打开它 |
 | `room.py` | 后宅的数据：家具目录、布局校验、套装进度、存档、本机 HTTP 服务 |
 | `room/` | 后宅网页（Vite + TypeScript + PixiJS），见 [room/README.md](room/README.md) |
 | `content/room/` | 后宅的家具目录（`catalog.json`）和打包好的单文件网页（`npm run release` 生成，提交进仓库） |

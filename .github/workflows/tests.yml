@@ -24,29 +24,6 @@ jobs:
       - run: python -c "import clips; assert clips.AVAILABLE"
       - run: python -m unittest discover -s tests -v
 
-  # 爬塔的规则测试（vitest）、类型检查 + 打包，再确认提交的 content/tower 和现在的源码、锁定依赖打出来的一字不差
-  tower:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: tower
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: tower/package-lock.json
-      - run: npm ci
-      - run: npm test
-      - run: npm run release
-      - name: content/tower 是最新打包
-        run: |
-          git diff --stat --exit-code -- ../content/tower || {
-            echo "::error::content/tower 和源码打出来的不一致：在 tower/ 里跑 npm run release 再提交 content/tower/"
-            exit 1
-          }
-
   # 后宅网页：几何和摆放规则测试（vitest）、类型检查 + 打包，再确认提交的 content/room 是最新打包
   room:
     runs-on: ubuntu-latest
@@ -85,8 +62,8 @@ jobs:
           node -e '
             const files = new Set(JSON.parse(require("fs").readFileSync("pack.json"))[0].files.map((f) => f.path))
             const need = ["package.json", "cordis.patch.yml", "dsh/index.js", "dsh/tool.js", "dsh/locale/zh.json",
-              "main.py", "control.py", "requirements.txt", "characters/dafeiyu/character.json", "characters/dafeiyu/sprites/icon.png", "content/tower/index.html",
+              "main.py", "control.py", "requirements.txt", "characters/dafeiyu/character.json", "characters/dafeiyu/sprites/icon.png",
               "room.py", "character.py", "content/room/index.html", "content/room/catalog.json"]
             const missing = need.filter((f) => !files.has(f))
             if (missing.length) { console.error("npm 包缺文件:", missing); process.exit(1) }
-            if ([...files].some((f) => f.startsWith("tower/") || f.startsWith("room/") || f.startsWith("tests/"))) { console.error("npm 包带了不该带的目录"); process.exit(1) }'
+            if ([...files].some((f) => f.startsWith("room/") || f.startsWith("tests/"))) { console.error("npm 包带了不该带的目录"); process.exit(1) }'
